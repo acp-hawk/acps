@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Connection Settings</title>
+  <style>
+    body {
+      background-color: #0a0a0a;
+      color: #e0e0e0;
+      font-family: sans-serif;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    label {
+      font-weight: bold;
+      color: #c41e3a;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+    input[type="text"] {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 1rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    input:focus {
+      border-color: #c41e3a;
+      outline: none;
+    }
+    .hint {
+      font-size: 0.8rem;
+      color: #666;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    button {
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #222;
+      color: #fff;
+      cursor: pointer;
+      text-transform: uppercase;
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+    button.primary {
+      background: #c41e3a;
+      border-color: #c41e3a;
+    }
+    button.primary:hover {
+      background: #a01830;
+    }
+    button.secondary:hover {
+      background: #333;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <label for="serverUrl">Target Server URL</label>
+    <input type="text" id="serverUrl" placeholder="http://localhost/admin/" />
+    <div class="hint">Enter the full URL of the AlleyCat Photo Admin interface (e.g., http://192.168.2.126/admin/)</div>
+  </div>
+  <div class="actions">
+    <button class="secondary" id="cancelBtn">Cancel</button>
+    <button class="primary" id="saveBtn">Save & Reload</button>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const input = document.getElementById('serverUrl');
+    const saveBtn = document.getElementById('saveBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    // Request current URL on load
+    ipcRenderer.invoke('get-settings').then(settings => {
+      input.value = settings.targetUrl || 'http://localhost/admin/';
+    });
+
+    saveBtn.addEventListener('click', () => {
+      let url = input.value.trim();
+      if (!url) return;
+      // Ensure trailing slash if it's a directory-like path
+      // But user might point to specific file, so let's be careful. 
+      // Actually standardizing on user input is safer.
+      
+      ipcRenderer.send('save-settings', { targetUrl: url });
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      window.close();
+    });
+  </script>
+</body>
+</html>

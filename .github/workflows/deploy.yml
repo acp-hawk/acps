@@ -1,0 +1,70 @@
+name: Mirror to AlleyCat & Update Servers
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  mirror-and-deploy:
+    runs-on: self-hosted  # Runs on your local machine, can reach LAN servers
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      
+      - name: Mirror to alleycatphoto/acps-server
+        env:
+          GH_TOKEN: ${{ secrets.ALLEYCATPHOTO_TOKEN }}
+        run: |
+          git remote remove alleycatphoto 2>$null
+          git remote add alleycatphoto "https://x-access-token:$($env:GH_TOKEN)@github.com/alleycatphoto/acps-server.git"
+          git push alleycatphoto main --force
+      
+      - name: Wait for mirror to complete
+        run: sleep 5
+      
+      - name: Update Hawks Nest Server
+        env:
+          SERVER_HOST: ${{ secrets.HAWK_HOST }}
+          SERVER_PORT: ${{ secrets.HAWK_PORT }}
+          SERVER_PATH: ${{ secrets.SERVER_PATH }}
+          SSH_KEY: ${{ secrets.CONPHOSERV_SSH_KEY }}
+        run: |
+          $env:SSH_KEY | Out-File -FilePath deploy_key -Encoding utf8
+          ssh -i deploy_key -o StrictHostKeyChecking=no -p $env:SERVER_PORT alleycat@$env:SERVER_HOST "cd $env:SERVER_PATH && git pull origin main && composer install --no-dev --optimize-autoloader"
+          Remove-Item deploy_key -ErrorAction SilentlyContinue
+      
+      - name: Update Hawk Moon Server
+        env:
+          SERVER_HOST: ${{ secrets.MOON_HOST }}
+          SERVER_PORT: ${{ secrets.MOON_PORT }}
+          SERVER_PATH: ${{ secrets.SERVER_PATH }}
+          SSH_KEY: ${{ secrets.CONPHOSERV_SSH_KEY }}
+        run: |
+          $env:SSH_KEY | Out-File -FilePath deploy_key -Encoding utf8
+          ssh -i deploy_key -o StrictHostKeyChecking=no -p $env:SERVER_PORT alleycat@$env:SERVER_HOST "cd $env:SERVER_PATH && git pull origin main && composer install --no-dev --optimize-autoloader"
+          Remove-Item deploy_key -ErrorAction SilentlyContinue
+      
+      - name: Update Zip Server
+        env:
+          SERVER_HOST: ${{ secrets.ZIP_HOST }}
+          SERVER_PORT: ${{ secrets.ZIP_PORT }}
+          SERVER_PATH: ${{ secrets.SERVER_PATH }}
+          SSH_KEY: ${{ secrets.CONPHOSERV_SSH_KEY }}
+        run: |
+          $env:SSH_KEY | Out-File -FilePath deploy_key -Encoding utf8
+          ssh -i deploy_key -o StrictHostKeyChecking=no -p $env:SERVER_PORT alleycat@$env:SERVER_HOST "cd $env:SERVER_PATH && git pull origin main && composer install --no-dev --optimize-autoloader"
+          Remove-Item deploy_key -ErrorAction SilentlyContinue
+      
+      - name: Notify Success
+        if: success()
+        run: echo "✅ Mirrored to alleycatphoto/acps-server and updated Hawks Nest, Hawk Moon, Zip servers"
+      
+      - name: Notify Failure
+        if: failure()
+        run: echo "❌ Mirror or server update failed. Check logs."

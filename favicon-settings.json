@@ -1,0 +1,32 @@
+{
+  "icon": {
+    "desktop": {
+      "regularIconTransformation": {
+        "type": "none"
+      },
+      "darkIconType": "none"
+    },
+    "touch": {
+      "transformation": {
+        "type": "background",
+        "backgroundColor": "#000000",
+        "backgroundRadius": 0,
+        "imageScale": 0.9
+      },
+      "appTitle": "ACPS90 - AlleyCat PhotoStation v9.0"
+    },
+    "webAppManifest": {
+      "transformation": {
+        "type": "background",
+        "backgroundColor": "#000000",
+        "backgroundRadius": 0,
+        "imageScale": 0.8
+      },
+      "backgroundColor": "#272727",
+      "name": "ACPS90 - AlleyCat PhotoStation v9.0",
+      "shortName": "ACPS90",
+      "themeColor": "#ff0000"
+    }
+  },
+  "path": "/public/assets/images/"
+}

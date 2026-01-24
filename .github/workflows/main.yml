@@ -1,0 +1,35 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, intl, gd, xml, dom, json, curl
+        coverage: none
+
+    - name: Install Dependencies
+      run: composer install --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --ignore-platform-reqs
+
+    - name: Run Tests
+      run: |
+        if [ -f vendor/bin/phpunit ]; then
+          vendor/bin/phpunit
+        else
+          echo "No tests found."
+        fi
+
+    - name: Lint PHP
+      run: find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \;

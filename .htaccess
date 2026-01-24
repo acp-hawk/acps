@@ -1,0 +1,31 @@
+# .htaccess
+<IfModule mod_headers.c>
+  # ----------------------------------------------------------------------
+  # CORS Headers (Cross-Origin Resource Sharing)
+  # ----------------------------------------------------------------------
+  Header always set Access-Control-Allow-Origin "*"
+  Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+</IfModule>
+
+<IfModule mod_authz_core.c>
+  Require all granted
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  Options +FollowSymLinks -MultiViews
+  RewriteEngine On
+
+  # Route ALL /api requests to VS public API handler
+  RewriteRule ^api(/.*)?$ vs/public/index.php [QSA,L]
+
+  # Route /ai requests to Scratching Post
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ai(/.*)?$ ai/index.php [QSA,L]
+
+  # Handle OPTIONS requests immediately (Preflight)
+  RewriteCond %{REQUEST_METHOD} OPTIONS
+  RewriteRule ^(.*)$ - [R=200,L]
+
+  DirectoryIndex index.php
+</IfModule>
