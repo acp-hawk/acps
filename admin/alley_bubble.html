@@ -1,0 +1,379 @@
+<!-- ALLEY Help Bubble Widget -->
+
+<style>
+.alley-bubble-container {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 99999;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.alley-bubble {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: bold;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.alley-bubble:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+}
+
+.alley-bubble.pulse {
+    animation: pulse-bubble 2s infinite;
+}
+
+@keyframes pulse-bubble {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Chat Modal */
+.alley-modal {
+    position: fixed;
+    bottom: 100px;
+    right: 30px;
+    width: 420px;
+    max-height: 600px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideUp 0.3s ease;
+    z-index: 99998;
+}
+
+.alley-modal.open {
+    display: flex;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.alley-header {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    padding: 16px;
+    font-weight: 600;
+    font-size: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.alley-header button {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.alley-header button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.alley-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #f8f9fa;
+}
+
+.alley-message {
+    display: flex;
+    gap: 8px;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.alley-message.user {
+    justify-content: flex-end;
+}
+
+.alley-message.alley {
+    justify-content: flex-start;
+}
+
+.alley-bubble-text {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.alley-message.user .alley-bubble-text {
+    background: #e74c3c;
+    color: white;
+    border-bottom-right-radius: 2px;
+}
+
+.alley-message.alley .alley-bubble-text {
+    background: white;
+    color: #333;
+    border-bottom-left-radius: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.alley-loading {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px;
+}
+
+.alley-loading span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e74c3c;
+    animation: bounce 1.4s infinite;
+}
+
+.alley-loading span:nth-child(1) { animation-delay: -0.32s; }
+.alley-loading span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+    40% { opacity: 1; transform: translateY(-10px); }
+}
+
+.alley-input-area {
+    padding: 12px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 8px;
+}
+
+.alley-input-area input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.alley-input-area input:focus {
+    border-color: #e74c3c;
+}
+
+.alley-input-area button {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.alley-input-area button:hover {
+    background: #c0392b;
+}
+
+.alley-input-area button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.alley-footer {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #999;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .alley-modal {
+        width: calc(100% - 40px);
+        bottom: 90px;
+        right: 20px;
+    }
+    
+    .alley-bubble-text {
+        max-width: 85%;
+    }
+}
+
+/* Scrollbar styling */
+.alley-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.alley-messages::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 10px;
+}
+
+.alley-messages::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 10px;
+}
+
+.alley-messages::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}
+</style>
+
+<!-- HTML -->
+<div class="alley-bubble-container">
+    <!-- Bubble Button -->
+    <div class="alley-bubble" id="alley-bubble-btn" title="Click for ALLEY (AI Help)">?</div>
+    
+    <!-- Chat Modal -->
+    <div class="alley-modal" id="alley-modal">
+        <div class="alley-header">
+            <span>🤖 ALLEY - AI Assistant</span>
+            <button onclick="closeAlleyChat()" title="Close">×</button>
+        </div>
+        
+        <div class="alley-messages" id="alley-messages"></div>
+        
+        <div class="alley-input-area">
+            <input type="text" id="alley-input" placeholder="Ask ALLEY anything..." autocomplete="off">
+            <button onclick="sendAlleyMessage()" id="alley-send-btn">Send</button>
+        </div>
+        
+        <div class="alley-footer">
+            Powered by Gemini 2.5-flash | All actions logged
+        </div>
+    </div>
+</div>
+
+<script>
+let alley_session_id = 'sess_' + Math.random().toString(36).substr(2, 9);
+let alley_is_loading = false;
+
+// Initialize
+document.getElementById('alley-bubble-btn').addEventListener('click', toggleAlleyChat);
+document.getElementById('alley-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !alley_is_loading) sendAlleyMessage();
+});
+
+// Add initial greeting
+setTimeout(() => {
+    addAlleyMessage("Hey there! I'm ALLEY, your witty AI assistant for all things ACPS. Need to reprint an order? Check email status? Troubleshoot that stubborn printer? I got you. What can I help with?", 'alley');
+}, 500);
+
+function toggleAlleyChat() {
+    const modal = document.getElementById('alley-modal');
+    modal.classList.toggle('open');
+    if (modal.classList.contains('open')) {
+        document.getElementById('alley-input').focus();
+    }
+}
+
+function closeAlleyChat() {
+    document.getElementById('alley-modal').classList.remove('open');
+}
+
+function addAlleyMessage(text, sender = 'alley') {
+    const container = document.getElementById('alley-messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `alley-message ${sender}`;
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'alley-bubble-text';
+    bubble.textContent = text;
+    
+    msgDiv.appendChild(bubble);
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+function sendAlleyMessage() {
+    const input = document.getElementById('alley-input');
+    const message = input.value.trim();
+    
+    if (!message || alley_is_loading) return;
+    
+    // Show user message
+    addAlleyMessage(message, 'user');
+    input.value = '';
+    
+    // Show loading
+    alley_is_loading = true;
+    const container = document.getElementById('alley-messages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'alley-message alley';
+    loadingDiv.innerHTML = '<div class="alley-loading"><span></span><span></span><span></span></div>';
+    container.appendChild(loadingDiv);
+    container.scrollTop = container.scrollHeight;
+    
+    // Send to ALLEY API
+    fetch('/config/api/alley.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            message: message,
+            session_id: alley_session_id,
+            context: {
+                page: window.location.pathname,
+                timestamp: new Date().toISOString()
+            }
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        loadingDiv.remove();
+        alley_is_loading = false;
+        addAlleyMessage(data.message, 'alley');
+        document.getElementById('alley-input').focus();
+    })
+    .catch(err => {
+        loadingDiv.remove();
+        alley_is_loading = false;
+        addAlleyMessage("Oops! Something went wrong. Check the console for details.", 'alley');
+        console.error('ALLEY Error:', err);
+    });
+}
+
+// Optional: Keyboard shortcut (Ctrl+Alt+A)
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.altKey && e.code === 'KeyA') {
+        toggleAlleyChat();
+    }
+});
+</script>
+
+<!-- Add this to your admin/index.php footer before closing </body> tag -->
