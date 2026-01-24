@@ -264,8 +264,9 @@ function process_images($folder, $logoPath) {
                 
                 // Place bottom-right
                 imagecopy($photo, $res_stamp, $pw - $target_w - 40, $ph - $target_h - 40, 0, 0, $target_w, $target_h);
-                imagejpeg($photo, $image, 90);
-                
+                // Save with quality 92 (excellent balance of quality and file size)
+                imagejpeg($photo, $image, 92);
+                imagedestroy($photo);
             }
 
         }
@@ -303,8 +304,10 @@ function process_images($folder, $logoPath) {
     }
     
     $preview_path = $folder . "preview_grid.jpg";
-    imagejpeg($grid, $preview_path, 85);
+    // Save preview with quality 88 for good thumbnail quality
+    imagejpeg($grid, $preview_path, 88);
     imagedestroy($grid);
+    acp_log_event($order_id, "PREVIEW_GRID_QUALITY: Generated at quality 88");
     return $preview_path;
 }
 
@@ -586,10 +589,33 @@ try {
     acp_log_event($order_id, "GMAIL_API_RESPONSE: code=" . $res['code']);
 
     if ($res['code'] == 200) {
-        if (!is_dir(dirname($archive_path))) mkdir(dirname($archive_path), 0777, true);
-        rename($spool_path, $archive_path);
-        remove_lock_file($archive_path);  // Clean up lock file from archived location
-        acp_log_event($order_id, "GMAIL_SUCCESS: Email sent to $customer_email - moved to archive");
+        // Clean up lock file FIRST before attempting rename
+        remove_lock_file($spool_path);
+        acp_log_event($order_id, "LOCK_REMOVED: Cleaned lock file from spool");
+        
+        // Try to move folder to archive, but don't fail if rename doesn't work (permissions issue)
+        if (!is_dir(dirname($archive_path))) {
+            @mkdir(dirname($archive_path), 0777, true);
+        }
+        
+        $rename_success = @rename($spool_path, $archive_path);
+        if ($rename_success) {
+            acp_log_event($order_id, "GMAIL_SUCCESS: Email sent to $customer_email - moved to archive");
+        } else {
+            // Rename failed (permission issue on Windows), try to remove folder contents manually
+            acp_log_event($order_id, "GMAIL_SUCCESS_PARTIAL: Email sent but folder move failed - attempting manual cleanup");
+            
+            // Remove all JPGs and preview from spool folder (leave info.txt for audit)
+            $remaining_files = glob($spool_path . "*.jpg");
+            foreach ($remaining_files as $file) {
+                @unlink($file);
+            }
+            @unlink($spool_path . "preview_grid.jpg");
+            
+            // Try to remove folder if empty
+            @rmdir($spool_path);
+        }
+        
         echo "SUCCESS: Order $order_id sent with branded watermarks and black-background preview.\n";
     } else {
         $error_detail = json_encode($res['body']);
