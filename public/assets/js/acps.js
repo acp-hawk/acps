@@ -334,7 +334,7 @@ function startQrPolling(squareOrderId) {
                 const formData = new FormData();
                 formData.append('payment_method', 'qr');
                 formData.append('email', state.email);
-                formData.append('amount', data.total_amount); // Use Square's returned amount (note: field name is total_amount from check_square_order.php)
+                formData.append('amount', (data.total_amount / 100)); // Square returns cents, convert to dollars
                 formData.append('square_token', squareOrderId); // Pass Square order ID for verification
                 
                 appendCommonFields(formData);

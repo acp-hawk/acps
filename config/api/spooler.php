@@ -201,6 +201,21 @@ switch ($action) {
                     if (strpos($content, '- FS') !== false || strpos($content, 'Fire Station') !== false) {
                         $is_fire = true;
                     }
+                } else {
+                    // TXT file not found yet (race condition during checkout)
+                    // Try to create from receipt as fallback recovery
+                    $receipt_file = __DIR__ . '/../../photos/' . date('Y/m/d') . "/receipts/$order_id.txt";
+                    if (file_exists($receipt_file)) {
+                        // Copy receipt as TXT metadata for spooler
+                        @copy($receipt_file, $txt_file);
+                        $content = file_get_contents($txt_file);
+                        if (strpos($content, '- FS') !== false) {
+                            $is_fire = true;
+                        }
+                    } else {
+                        // No receipt either - skip and retry next tick
+                        continue;
+                    }
                 }
 
                 if ($is_fire) {

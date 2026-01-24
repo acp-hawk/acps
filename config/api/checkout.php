@@ -308,7 +308,17 @@ if ($isPaid) {
 
         // FIRST: Create TXT file so spooler knows MS/FS destination
         // This ensures the metadata exists BEFORE any JPGs are queued
-        @file_put_contents($printer_spool . $orderID . ".txt", $message);
+        $txt_path = $printer_spool . $orderID . ".txt";
+        $txt_written = @file_put_contents($txt_path, $message);
+        if (!$txt_written) {
+            // Fallback: try without suppression to debug
+            error_log("WARNING: TXT write suppressed for order $orderID. Retrying...");
+            file_put_contents($txt_path, $message);
+        }
+        
+        // Small delay to ensure file system has flushed the TXT file to disk
+        // This prevents race condition where spooler finds JPG before TXT exists
+        usleep(50000); // 0.05 second delay for disk flush
 
         // THEN: Create print files one at a time with delay
         // This allows spooler to process them sequentially instead of being overwhelmed
