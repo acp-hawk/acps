@@ -111,6 +111,7 @@ $savings = $cc_totaltaxed - $amount_without_tax;
     <!-- Pass PHP vars to JS -->
     <script>
         window.acps_amount_without_tax = <?php echo json_encode($amount_without_tax); ?>;
+        window.acps_cc_totaltaxed = <?php echo json_encode($cc_totaltaxed); ?>;
         window.acps_skip_delivery = <?php echo $skipDelivery ? 'true' : 'false'; ?>;
         window.acps_total = <?php echo json_encode($amount_with_tax); ?>;
         window.acps_base_total = <?php echo json_encode($thisTotal); ?>;

@@ -68,16 +68,16 @@ function acp_get_autoprint_status(): bool {
 
 
 function acp_watermark_image($source, $dest) {
-    $logoPath = __DIR__ . '/../../public/assets/images/alley_logo.png';
+    $logoPath = __DIR__ . '/../../public/assets/images/pixel.png';
     $logo_to_use = null;
     
     // Check LOCATION_LOGO env var first
-    if (!empty(getenv('LOCATION_LOGO'))) {
-        $env_logo = getenv('LOCATION_LOGO');
-        if (is_string($env_logo) && file_exists($env_logo)) {
-            $logo_to_use = $env_logo;
-        }
-    }
+    //if (!empty(getenv('LOCATION_LOGO'))) {
+    //    $env_logo = getenv('LOCATION_LOGO');
+    //    if (is_string($env_logo) && file_exists($env_logo)) {
+    //        $logo_to_use = $env_logo;
+    //    }
+    // }
     
     // Fallback to local path
     if (!$logo_to_use && file_exists($logoPath)) {

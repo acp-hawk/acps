@@ -195,9 +195,7 @@ function processSwipe(swipeData) {
         formData.append('exp_month', expMonth);
         formData.append('exp_year', expYear);
         formData.append('email', state.email);
-        formData.append('amount', window.acps_base_total); // Tax calculated in PHP for receipt, but ePN takes total? ePN logic in checkout.php takes 'Total' which is formatted from passed amount. Passed amount should be total including tax. Wait, pay.php said "Input is Tax Inclusive" for cart_process.
-        // window.acps_base_total is from $_GET['amt'].
-        // Checkout.php takes 'amount' and formats it.
+        formData.append('amount', window.acps_cc_totaltaxed); // Credit card includes tax and service fee
         
         // Add Common Fields
         appendCommonFields(formData);
@@ -240,12 +238,12 @@ function processCash() {
     state.isCheckoutProcessing = true;
     showLoader('Creating Order...');
     
-    // Cash Amount (Base)
-    const baseAmt = window.acps_amount_without_tax; // Passed from pay.php
+    // Cash Amount (Base only, no tax)
+    const baseAmt = window.acps_amount_without_tax;
     
     const formData = new FormData();
     formData.append('payment_method', 'cash');
-    formData.append('amount', baseAmt); // Cash pending uses base amount
+    formData.append('amount', baseAmt); // Cash pending uses base amount only
     formData.append('email', state.email);
     
     appendCommonFields(formData);
@@ -336,7 +334,7 @@ function startQrPolling(squareOrderId) {
                 const formData = new FormData();
                 formData.append('payment_method', 'qr');
                 formData.append('email', state.email);
-                formData.append('amount', window.acps_amount_with_tax); // Include tax
+                formData.append('amount', data.total_amount); // Use Square's returned amount (note: field name is total_amount from check_square_order.php)
                 formData.append('square_token', squareOrderId); // Pass Square order ID for verification
                 
                 appendCommonFields(formData);

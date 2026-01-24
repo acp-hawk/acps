@@ -259,7 +259,7 @@ if ($isPaid) {
     // A. SPOOL EMAIL
     if ($txtEmail != '') {
         $toPath = $dirname . $date_path . "/pending_email";
-        $filePath = $dirname . $date_path . "/emails/" . $txtEmail;
+        $filePath = $dirname . $date_path . "/emails/" . $orderID;
         if (!is_dir($toPath)) mkdir($toPath, 0777, true);
         if (!is_dir($filePath)) mkdir($filePath, 0777, true);
 
@@ -306,6 +306,12 @@ if ($isPaid) {
         $printer_spool = $dirname . $date_path . "/spool/printer/";
         if (!is_dir($printer_spool)) @mkdir($printer_spool, 0777, true);
 
+        // FIRST: Create TXT file so spooler knows MS/FS destination
+        // This ensures the metadata exists BEFORE any JPGs are queued
+        @file_put_contents($printer_spool . $orderID . ".txt", $message);
+
+        // THEN: Create print files one at a time with delay
+        // This allows spooler to process them sequentially instead of being overwhelmed
         foreach ($items as $order_code => $quantity) {
             [$prod_code, $photo_id] = explode('-', $order_code);
             $prod_code = trim($prod_code);
@@ -322,12 +328,11 @@ if ($isPaid) {
                     for ($i = 1; $i <= $quantity; $i++) {
                         $filename = sprintf("%s-%s-%s%s-%d.jpg", $orderID, $photo_id, $prod_code, $orientation, $i);
                         acp_watermark_image($sourcefile, $printer_spool . $filename);
+                        usleep(100000); // 0.1 second delay between files to prevent printer overload
                     }
                 }
             }
         }
-        // Log receipt for reference in spool
-        @file_put_contents($printer_spool . $orderID . ".txt", $message);
     }
 
     // C. UPDATE SALES CSV (when payment is approved)
