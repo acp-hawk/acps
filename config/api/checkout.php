@@ -256,9 +256,18 @@ $isPaid = ($paymentMethod !== 'cash'); // Square, QR, Credit = Paid. Cash = Pend
 // If you need to test cash orders that queue email, use order_action.php dashboard button
 
 if ($isPaid) {
-    // A. SPOOL EMAIL
-    if ($txtEmail != '') {
-        $toPath = $dirname . $date_path . "/pending_email";
+        // A. SPOOL EMAIL (only if order contains email items)
+        // First: count email items
+        $email_item_count = 0;
+        foreach ($items as $order_code => $quantity) {
+            [$prod_code, $photo_id] = explode('-', $order_code);
+            if (trim($prod_code) == 'EML' && $quantity > 0) {
+                $email_item_count += $quantity;
+            }
+        }
+        
+        // Only queue to email if: email address provided AND email items exist
+        if ($txtEmail != '' && $email_item_count > 0) {
         $filePath = $dirname . $date_path . "/emails/" . $orderID;
         if (!is_dir($toPath)) mkdir($toPath, 0777, true);
         if (!is_dir($filePath)) mkdir($filePath, 0777, true);
