@@ -33,6 +33,8 @@ if (file_exists($vendorAutoload)) {
     }
 }
 
+// Create logs directory if it doesn't exist
+@mkdir(__DIR__.'/logs', 0777, true);
 if (file_put_contents(__DIR__.'/logs/import_post_debug.log', print_r($_POST, true), FILE_APPEND) === false) {
     error_log('Failed to write to import_post_debug.log');
 }

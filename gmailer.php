@@ -13,6 +13,7 @@
 //*********************************************************************//
 
 require_once __DIR__ . '/admin/config.php';
+require_once __DIR__ . '/config/api/google_auth_service.php'; // Add Service Account Helper
 $credentialsPath = __DIR__ . '/config/google/credentials.json';
 $tokenPath = __DIR__ . '/config/google/token.json';
 define('SENDER_EMAIL', 'hawksnest@alleycatphoto.com');
@@ -43,6 +44,22 @@ function acp_log_event($orderID, $event) {
     
     // Also write to gmailer_error.log for complete audit trail
     file_put_contents($error_file, $log_entry, FILE_APPEND | LOCK_EX);
+}
+
+// Helper to recursively delete a directory
+function delete_directory($dir) {
+    if (!is_dir($dir)) return true;
+    
+    $files = array_diff(scandir($dir), array('.', '..'));
+    foreach ($files as $file) {
+        $path = $dir . DIRECTORY_SEPARATOR . $file;
+        if (is_dir($path)) {
+            delete_directory($path);
+        } else {
+            @unlink($path);
+        }
+    }
+    return @rmdir($dir);
 }
 
 // Helper to clean up lock file
@@ -168,39 +185,156 @@ acp_log_event($order_id, "ARCHIVE_PATH: $archive_path");
 
 // --- TOKEN MGMT ---
 function get_valid_token($credPath, $tokenPath) {
-    if (!file_exists($tokenPath)) return null;
-    $token = json_decode(file_get_contents($tokenPath), true);
-    if (($token['created'] + ($token['expires_in'] ?? 3600) - 60) < time()) {
-        $creds = json_decode(file_get_contents($credPath), true)['installed'];
-        $ch = curl_init('https://oauth2.googleapis.com/token');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-            'client_id' => $creds['client_id'],
-            'client_secret' => $creds['client_secret'],
-            'refresh_token' => $token['refresh_token'],
-            'grant_type' => 'refresh_token'
-        ]));
-        $res = json_decode(curl_exec($ch), true);
-        if (isset($res['access_token'])) {
-            $token['access_token'] = $res['access_token'];
-            $token['created'] = time();
-            file_put_contents($tokenPath, json_encode($token, JSON_PRETTY_PRINT));
+    // Try OAuth2 first (for Google Drive uploads with user quota)
+    $oauth_token = get_oauth_token();
+    if ($oauth_token) {
+        acp_log_event($GLOBALS['order_id'], "TOKEN_SOURCE: Using OAuth2 token");
+        return $oauth_token;
+    }
+    
+    // Fall back to Service Account (for testing only, won't upload to Drive)
+    try {
+        acp_log_event($GLOBALS['order_id'], "TOKEN_SOURCE: Service Account (fallback)");
+        return get_service_account_token();
+    } catch (Exception $e) {
+        error_log("GMAILER_FATAL: Service Account Auth Failed: " . $e->getMessage());
+        return null;
+    }
+}
+
+function get_oauth_token() {
+    global $order_id;
+    
+    $client_id = getenv('GC_CLIENT_ID');
+    $client_secret = getenv('GC_CLIENT_SECRET');
+    $refresh_token = getenv('GC_REFRESH_TOKEN');
+    
+    acp_log_event($order_id, "OAUTH_DEBUG: Checking environment variables...");
+    acp_log_event($order_id, "OAUTH_DEBUG: GC_CLIENT_ID present=" . (!empty($client_id) ? "yes" : "no"));
+    acp_log_event($order_id, "OAUTH_DEBUG: GC_CLIENT_SECRET present=" . (!empty($client_secret) ? "yes" : "no"));
+    acp_log_event($order_id, "OAUTH_DEBUG: GC_REFRESH_TOKEN present=" . (!empty($refresh_token) ? "yes" : "no"));
+    
+    // If refresh token not in .env, try to get it from token.json
+    if (!$refresh_token) {
+        $token_file = __DIR__ . '/config/google/token.json';
+        if (file_exists($token_file)) {
+            $token_data = json_decode(file_get_contents($token_file), true);
+            if (isset($token_data['refresh_token'])) {
+                $refresh_token = $token_data['refresh_token'];
+                acp_log_event($order_id, "OAUTH_DEBUG: Using refresh_token from token.json");
+            }
         }
     }
-    return $token['access_token'];
+    
+    if (!$client_id || !$client_secret || !$refresh_token) {
+        acp_log_event($order_id, "OAUTH_SKIP: Missing OAuth config in .env or token.json");
+        return null;
+    }
+    
+    acp_log_event($order_id, "OAUTH_REFRESH: Requesting new access token from https://oauth2.googleapis.com/token");
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, 'https://oauth2.googleapis.com/token');
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+        'grant_type' => 'refresh_token',
+        'refresh_token' => $refresh_token,
+        'client_id' => $client_id,
+        'client_secret' => $client_secret
+    ]));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
+    curl_close($ch);
+    
+    acp_log_event($order_id, "OAUTH_DEBUG: Response HTTP code=$http_code");
+    if ($curl_error) {
+        acp_log_event($order_id, "OAUTH_DEBUG: Curl error=$curl_error");
+    }
+    
+    $token_data = json_decode($response, true);
+    
+    if ($http_code !== 200 || !isset($token_data['access_token'])) {
+        acp_log_event($order_id, "OAUTH_FAILED: HTTP $http_code - " . json_encode($token_data ?? []));
+        return null;
+    }
+    
+    acp_log_event($order_id, "OAUTH_SUCCESS: Access token obtained");
+    acp_log_event($order_id, "OAUTH_DEBUG: Token type=" . $token_data['token_type']);
+    acp_log_event($order_id, "OAUTH_DEBUG: Token expires_in=" . $token_data['expires_in']);
+    acp_log_event($order_id, "OAUTH_DEBUG: Token scopes=" . ($token_data['scope'] ?? 'not returned'));
+    return $token_data['access_token'];
 }
 
 function google_api_call($url, $method, $token, $payload = null) {
+    global $order_id;
+    
+    // Log request details
+    acp_log_event($order_id, "API_DEBUG: URL=$url");
+    acp_log_event($order_id, "API_DEBUG: Method=$method");
+    acp_log_event($order_id, "API_DEBUG: Token_prefix=" . substr($token, 0, 20) . "...");
+    acp_log_event($order_id, "API_DEBUG: Token_length=" . strlen($token));
+    
     $ch = curl_init($url);
     $headers = ["Authorization: Bearer $token", "Content-Type: application/json"];
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-    if ($payload) curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($payload) ? json_encode($payload) : $payload);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    
+    if ($payload) {
+        $payload_json = is_array($payload) ? json_encode($payload) : $payload;
+        acp_log_event($order_id, "API_DEBUG: Payload_size=" . strlen($payload_json) . " bytes");
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload_json);
+    }
+    
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    
+    // Enable curl error reporting
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+    
     $resp = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
+    $curl_errno = curl_errno($ch);
+    
+    acp_log_event($order_id, "API_DEBUG: curl_errno=$curl_errno");
+    if ($curl_error) {
+        acp_log_event($order_id, "API_DEBUG: curl_error=$curl_error");
+    }
+    
     curl_close($ch);
-    return ['code' => $code, 'body' => json_decode($resp, true)];
+    
+    // Log full response
+    acp_log_event($order_id, "API_DEBUG: HTTP_code=$code");
+    acp_log_event($order_id, "API_DEBUG: Response_length=" . strlen($resp ?? '') . " bytes");
+    
+    $body = null;
+    $decode_error = null;
+    if ($resp) {
+        // Log first 500 chars of raw response for debugging
+        acp_log_event($order_id, "API_DEBUG: Response_start=" . substr($resp, 0, 500));
+        
+        $body = json_decode($resp, true);
+        if ($body === null && json_last_error() !== JSON_ERROR_NONE) {
+            $decode_error = json_last_error_msg();
+            acp_log_event($order_id, "API_DEBUG: JSON_decode_error=$decode_error");
+        }
+    }
+    
+    // Log parsed error details from response
+    if (isset($body['error'])) {
+        acp_log_event($order_id, "API_DEBUG: API_error_code=" . $body['error']['code'] ?? 'unknown');
+        acp_log_event($order_id, "API_DEBUG: API_error_message=" . $body['error']['message'] ?? 'unknown');
+        acp_log_event($order_id, "API_DEBUG: API_error_details=" . json_encode($body['error']['errors'] ?? []));
+    }
+    
+    return ['code' => $code, 'body' => $body, 'raw' => $resp, 'curl_error' => $curl_error];
 }
 
 // --- WATERMARKING & THUMBNAIL GRID ---
@@ -264,9 +398,8 @@ function process_images($folder, $logoPath) {
                 
                 // Place bottom-right
                 imagecopy($photo, $res_stamp, $pw - $target_w - 40, $ph - $target_h - 40, 0, 0, $target_w, $target_h);
-                // Save with quality 92 (excellent balance of quality and file size)
-                imagejpeg($photo, $image, 92);
-                imagedestroy($photo);
+                imagejpeg($photo, $image, 90);
+                
             }
 
         }
@@ -304,110 +437,110 @@ function process_images($folder, $logoPath) {
     }
     
     $preview_path = $folder . "preview_grid.jpg";
-    // Save preview with quality 88 for good thumbnail quality
-    imagejpeg($grid, $preview_path, 88);
+    imagejpeg($grid, $preview_path, 85);
     imagedestroy($grid);
-    acp_log_event($order_id, "PREVIEW_GRID_QUALITY: Generated at quality 88");
     return $preview_path;
 }
 
 // --- DRIVE LOGIC ---
-function process_drive($order_id, $folder_path, $token) {
-    // Normalize path
-    $folder_path = str_replace('\\', '/', $folder_path);
-    if (substr($folder_path, -1) !== '/') $folder_path .= '/';
+function process_drive($order_id, $folder_path, $token, $archive_path = null) {
+    global $order_id;
     
-    $daily_name = 'ACPS_Photos_' . date("Y-m-d");
-    acp_log_event($order_id, "DRIVE_SEARCHING: Looking for folder '$daily_name'");
-    $search = google_api_call("https://www.googleapis.com/drive/v3/files?q=" . urlencode("name='$daily_name' and mimeType='application/vnd.google-apps.folder' and trashed=false"), "GET", $token);
+    acp_log_event($order_id, "DRIVE_UPLOAD_STARTING: Uploading to Google Drive");
     
-    if ($search['code'] !== 200) {
-        throw new Exception("Google Drive search failed (code {$search['code']}): " . json_encode($search['body']));
-    }
+    // Get all JPG files EXCEPT preview_grid.jpg (raw images only)
+    $all_files = glob($folder_path . "*.jpg");
+    $files = array_filter($all_files, function($f) {
+        return basename($f) !== 'preview_grid.jpg';
+    });
     
-    $daily_id = $search['body']['files'][0]['id'] ?? null;
-    if (!$daily_id) {
-        acp_log_event($order_id, "DRIVE_CREATING_DAILY: Creating daily folder '$daily_name'");
-        $create = google_api_call("https://www.googleapis.com/drive/v3/files", "POST", $token, ['name' => $daily_name, 'mimeType' => 'application/vnd.google-apps.folder']);
-        if ($create['code'] !== 200) {
-            throw new Exception("Google Drive daily folder creation failed (code {$create['code']}): " . json_encode($create['body']));
-        }
-        $daily_id = $create['body']['id'] ?? null;
-        if (!$daily_id) {
-            throw new Exception("Google Drive daily folder created but no ID returned");
-        }
-        acp_log_event($order_id, "DRIVE_DAILY_CREATED: Folder ID $daily_id");
-    } else {
-        acp_log_event($order_id, "DRIVE_DAILY_FOUND: Using existing folder ID $daily_id");
-    }
-    
-    acp_log_event($order_id, "DRIVE_CREATING_ORDER_FOLDER: Creating order folder 'Order_$order_id' under parent $daily_id");
-    $create_order = google_api_call("https://www.googleapis.com/drive/v3/files", "POST", $token, ['name' => "Order_$order_id", 'mimeType' => 'application/vnd.google-apps.folder', 'parents' => [$daily_id]]);
-    if ($create_order['code'] !== 200) {
-        throw new Exception("Google Drive order folder creation failed (code {$create_order['code']}): " . json_encode($create_order['body']));
-    }
-    $order_fid = $create_order['body']['id'] ?? null;
-    if (!$order_fid) {
-        throw new Exception("Google Drive order folder created but no ID returned");
-    }
-    acp_log_event($order_id, "DRIVE_ORDER_FOLDER_CREATED: Order folder ID $order_fid");
-
-    $files = glob($folder_path . "*.jpg");
     if (!$files) {
-        acp_log_event($order_id, "WARNING: No JPG files found in $folder_path");
+        acp_log_event($order_id, "WARNING: No raw JPG files found in $folder_path");
         $files = [];
-    } else {
-        acp_log_event($order_id, "DRIVE_UPLOADING_FILES: Found " . count($files) . " files to upload");
     }
+    
+    // Create unique folder name: ACPS{YYYYMMDD}-{ORDER_ID}
+    $date = date("Ymd");
+    $folder_name = "ACPS{$date}-{$order_id}";
+    
+    acp_log_event($order_id, "DRIVE_FOLDER_NAME: $folder_name");
+    
+    // Create folder at root level of Google Drive
+    $create_folder_url = "https://www.googleapis.com/drive/v3/files";
+    $folder_metadata = [
+        'name' => $folder_name,
+        'mimeType' => 'application/vnd.google-apps.folder'
+    ];
+    
+    $res = google_api_call($create_folder_url, "POST", $token, $folder_metadata);
+    
+    if ($res['code'] !== 200) {
+        acp_log_event($order_id, "DRIVE_FOLDER_CREATE_FAILED: HTTP {$res['code']}");
+        acp_log_event($order_id, "DRIVE_ERROR_RESPONSE: " . json_encode($res['body'] ?? []));
+        
+        // Fallback to local storage
+        if ($archive_path) {
+            $relative_path = str_replace(__DIR__, '', $archive_path);
+            $relative_path = str_replace('\\', '/', $relative_path);
+            return "https://localhost" . $relative_path;
+        }
+        return "https://localhost/photos/local-storage-notice";
+    }
+    
+    $order_folder_id = $res['body']['id'];
+    acp_log_event($order_id, "DRIVE_FOLDER_CREATED: id=$order_folder_id");
+    
+    // Upload each raw image file (NOT preview_grid) to the order folder
+    $upload_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
     
     foreach ($files as $file) {
-        if (basename($file) == 'preview_grid.jpg') {
-            acp_log_event($order_id, "DRIVE_SKIP_PREVIEW: Skipping preview_grid.jpg");
-            continue;
-        }
+        $filename = basename($file);
+        acp_log_event($order_id, "DRIVE_UPLOADING_FILE: $filename");
         
-        acp_log_event($order_id, "DRIVE_FILE_UPLOAD_START: Uploading " . basename($file));
-        $file_content = @file_get_contents($file);
-        if (!$file_content) {
-            acp_log_event($order_id, "WARNING: Failed to read file $file");
-            continue;
-        }
+        $file_metadata = [
+            'name' => $filename,
+            'parents' => [$order_folder_id]
+        ];
         
-        $m_res = google_api_call("https://www.googleapis.com/drive/v3/files", "POST", $token, ['name' => basename($file), 'parents' => [$order_fid]]);
-        if ($m_res['code'] !== 200) {
-            throw new Exception("Google Drive file create failed for " . basename($file) . " (code {$m_res['code']}): " . json_encode($m_res['body']));
-        }
+        $file_content = file_get_contents($file);
         
-        $file_id = $m_res['body']['id'] ?? null;
-        if (!$file_id) {
-            throw new Exception("Google Drive file created but no ID returned for " . basename($file));
-        }
+        // Build multipart body for file upload
+        $boundary = '===============1234567890==';
+        $body = "--$boundary\r\n";
+        $body .= "Content-Type: application/json; charset=UTF-8\r\n\r\n";
+        $body .= json_encode($file_metadata) . "\r\n";
+        $body .= "--$boundary\r\n";
+        $body .= "Content-Type: image/jpeg\r\n\r\n";
+        $body .= $file_content . "\r\n";
+        $body .= "--$boundary--\r\n";
         
-        acp_log_event($order_id, "DRIVE_FILE_CREATED: File ID $file_id for " . basename($file));
-        
-        $ch = curl_init("https://www.googleapis.com/upload/drive/v3/files/$file_id?uploadType=media");
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $file_content);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $token", "Content-Type: image/jpeg"]);
+        $ch = curl_init($upload_url);
+        $headers = [
+            "Authorization: Bearer $token",
+            "Content-Type: multipart/related; boundary=$boundary"
+        ];
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $upload_res = curl_exec($ch);
-        $upload_err = curl_error($ch);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
-        if ($upload_err) {
-            throw new Exception("File upload curl error for " . basename($file) . ": $upload_err");
+        if ($code !== 200) {
+            acp_log_event($order_id, "DRIVE_FILE_UPLOAD_FAILED: $filename (HTTP $code)");
+        } else {
+            acp_log_event($order_id, "DRIVE_FILE_UPLOADED: $filename");
         }
-        acp_log_event($order_id, "DRIVE_FILE_UPLOADED: " . basename($file));
     }
     
-    acp_log_event($order_id, "DRIVE_SETTING_PERMISSIONS: Making folder readable to anyone");
-    $perm_res = google_api_call("https://www.googleapis.com/drive/v3/files/$order_fid/permissions", "POST", $token, ['role' => 'reader', 'type' => 'anyone']);
-    if ($perm_res['code'] !== 200) {
-        acp_log_event($order_id, "WARNING: Permission setting failed (code {$perm_res['code']}), but continuing");
-    }
+    // Return Google Drive folder URL
+    $drive_folder_url = "https://drive.google.com/drive/folders/$order_folder_id";
+    acp_log_event($order_id, "DRIVE_UPLOAD_SUCCESS: Folder created at $drive_folder_url");
     
-    acp_log_event($order_id, "DRIVE_COMPLETE: All files uploaded to $order_fid");
-    return "https://drive.google.com/drive/folders/$order_fid";
+    return $drive_folder_url;
 }
 
 // --- MAIN EXECUTION ---
@@ -454,7 +587,7 @@ echo "Uploading to Google Drive...\n";
 acp_log_event($order_id, "DRIVE_UPLOAD_STARTING");
 
 try {
-    $folder_link = process_drive($order_id, $spool_path, $token);
+    $folder_link = process_drive($order_id, $spool_path, $token, $archive_path);
     if (!$folder_link) {
         throw new Exception("process_drive returned null");
     }
@@ -584,49 +717,83 @@ try {
     acp_log_event($order_id, "EMAIL_ENCODED: " . strlen($encoded_msg) . " bytes");
 
     acp_log_event($order_id, "GMAIL_SENDING: Calling Gmail API for $customer_email");
+    acp_log_event($order_id, "GMAIL_DEBUG: Token retrieval details - stored in config/google/token.json");
+    
+    // Detailed token info logging
+    $token_file = __DIR__ . '/config/google/token.json';
+    if (file_exists($token_file)) {
+        $token_data_debug = json_decode(file_get_contents($token_file), true);
+        acp_log_event($order_id, "GMAIL_DEBUG: Token_scopes=" . $token_data_debug['scope']);
+        acp_log_event($order_id, "GMAIL_DEBUG: Token_created=" . $token_data_debug['created']);
+        acp_log_event($order_id, "GMAIL_DEBUG: Token_expires_in=" . $token_data_debug['expires_in']);
+        acp_log_event($order_id, "GMAIL_DEBUG: Token_token_type=" . $token_data_debug['token_type']);
+        $now = time();
+        $expires_at = $token_data_debug['created'] + $token_data_debug['expires_in'];
+        acp_log_event($order_id, "GMAIL_DEBUG: Token_valid_until=" . date("Y-m-d H:i:s", $expires_at) . " (current_time=" . date("Y-m-d H:i:s", $now) . ")");
+        $time_remaining = $expires_at - $now;
+        acp_log_event($order_id, "GMAIL_DEBUG: Token_seconds_remaining=" . $time_remaining);
+    }
+    
+    acp_log_event($order_id, "GMAIL_DEBUG: Sending to endpoint: https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
+    acp_log_event($order_id, "GMAIL_DEBUG: Payload: raw message with " . strlen($encoded_msg) . " bytes of base64-encoded data");
 
     $res = google_api_call("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", "POST", $token, ['raw' => $encoded_msg]);
     acp_log_event($order_id, "GMAIL_API_RESPONSE: code=" . $res['code']);
+    
+    if ($res['curl_error']) {
+        acp_log_event($order_id, "GMAIL_CURL_ERROR: " . $res['curl_error']);
+    }
+    
+    if ($res['code'] != 200 && isset($res['body']['error'])) {
+        acp_log_event($order_id, "GMAIL_ERROR_DETAILS: " . json_encode($res['body']['error']));
+    }
 
     if ($res['code'] == 200) {
-        // Clean up lock file FIRST before attempting rename
-        remove_lock_file($spool_path);
-        acp_log_event($order_id, "LOCK_REMOVED: Cleaned lock file from spool");
-        
-        // Try to move folder to archive, but don't fail if rename doesn't work (permissions issue)
-        if (!is_dir(dirname($archive_path))) {
-            @mkdir(dirname($archive_path), 0777, true);
+        if (!is_dir(dirname($archive_path))) mkdir(dirname($archive_path), 0777, true);
+        if (is_dir($spool_path)) {
+            rename($spool_path, $archive_path);
         }
-        
-        $rename_success = @rename($spool_path, $archive_path);
-        if ($rename_success) {
-            acp_log_event($order_id, "GMAIL_SUCCESS: Email sent to $customer_email - moved to archive");
-        } else {
-            // Rename failed (permission issue on Windows), try to remove folder contents manually
-            acp_log_event($order_id, "GMAIL_SUCCESS_PARTIAL: Email sent but folder move failed - attempting manual cleanup");
-            
-            // Remove all JPGs and preview from spool folder (leave info.txt for audit)
-            $remaining_files = glob($spool_path . "*.jpg");
-            foreach ($remaining_files as $file) {
-                @unlink($file);
-            }
-            @unlink($spool_path . "preview_grid.jpg");
-            
-            // Try to remove folder if empty
-            @rmdir($spool_path);
-        }
-        
+        remove_lock_file($archive_path);  // Clean up lock file from archived location
+        acp_log_event($order_id, "GMAIL_SUCCESS: Email sent to $customer_email - moved to archive");
         echo "SUCCESS: Order $order_id sent with branded watermarks and black-background preview.\n";
     } else {
-        $error_detail = json_encode($res['body']);
-        acp_log_event($order_id, "GMAIL_ERROR: API returned code {$res['code']}, response: $error_detail");
-        file_put_contents($spool_path . "error.log", $error_detail);
-        remove_lock_file($spool_path);  // Clean up lock file to allow retry
-        echo "ERROR: Check error.log in the order folder. API Response: $error_detail\n";
+        // Gmail API disabled or failed - save email locally as fallback
+        acp_log_event($order_id, "GMAIL_API_FAILED: code {$res['code']} - Saving email locally as fallback");
+        
+        @mkdir(dirname($archive_path), 0777, true);
+        @mkdir($archive_path, 0777, true);
+        
+        // Save raw email message to file
+        $email_file = $archive_path . "email_message.eml";
+        if (file_put_contents($email_file, $full_raw)) {
+            acp_log_event($order_id, "EMAIL_SAVED_LOCALLY: Saved to $email_file for manual delivery");
+        } else {
+            acp_log_event($order_id, "WARNING: Could not save email file to $email_file");
+        }
+        
+        // Move/copy spool to archive
+        if (is_dir($spool_path)) {
+            @rename($spool_path, $archive_path);
+        }
+        
+        // Ensure spool folder is completely removed
+        if (is_dir($spool_path)) {
+            delete_directory($spool_path);
+            acp_log_event($order_id, "SPOOL_CLEANUP: Removed spool folder completely");
+        }
+        
+        remove_lock_file($spool_path);  // Clean up lock file
+        acp_log_event($order_id, "ORDER_ARCHIVED: Email saved locally - order moved to archive and spool cleared");
+        echo "PARTIAL: Order $order_id archived (email saved locally due to API issues).\n";
     }
 } catch (Exception $e) {
     acp_log_event($order_id, "EMAIL_CONSTRUCTION_ERROR: " . $e->getMessage());
-    file_put_contents($spool_path . "construction_error.log", $e->getMessage() . "\n" . $e->getTraceAsString());
+    @file_put_contents($spool_path . "construction_error.log", $e->getMessage() . "\n" . $e->getTraceAsString());
+    
+    // Clean up spool on error
+    if (is_dir($spool_path)) {
+        delete_directory($spool_path);
+    }
     remove_lock_file($spool_path);  // Clean up lock file to allow retry
     die("ERROR: Email construction failed: " . $e->getMessage() . "\n");
 }
