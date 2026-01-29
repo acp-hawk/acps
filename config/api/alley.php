@@ -24,7 +24,7 @@ try {
 
 // Gemini API Configuration
 $gemini_api_key = getenv('GEMINI_API_KEY');
-$gemini_model = 'gemini-2.5-flash-latest';
+$gemini_model = 'gemini-1.5-flash';
 $gemini_url = "https://generativelanguage.googleapis.com/v1beta/models/$gemini_model:generateContent";
 
 // Incoming request
@@ -105,12 +105,18 @@ $tools = [
     [
         'name' => 'get_print_queue_status',
         'description' => 'Check current state of print queue (pending, by station)',
-        'parameters' => ['type' => 'object', 'properties' => []]
+        'parameters' => [
+            'type' => 'object',
+            'properties' => (object)[]
+        ]
     ],
     [
         'name' => 'get_email_queue_status',
         'description' => 'Check pending and failed emails',
-        'parameters' => ['type' => 'object', 'properties' => []]
+        'parameters' => [
+            'type' => 'object',
+            'properties' => (object)[]
+        ]
     ],
     [
         'name' => 'check_email_logs',
@@ -126,7 +132,10 @@ $tools = [
     [
         'name' => 'check_printer_status',
         'description' => 'Check if printers (Main/Fire) are ready or busy',
-        'parameters' => ['type' => 'object', 'properties' => []]
+        'parameters' => [
+            'type' => 'object',
+            'properties' => (object)[]
+        ]
     ],
     [
         'name' => 'create_missing_txt_metadata',
@@ -142,22 +151,30 @@ $tools = [
     [
         'name' => 'check_system_health',
         'description' => 'Full system diagnostics: disk space, permissions, API connectivity',
-        'parameters' => ['type' => 'object', 'properties' => []]
+        'parameters' => [
+            'type' => 'object',
+            'properties' => (object)[]
+        ]
     ]
 ];
 
 // First turn: Send user message + tools to Gemini
 $request_body = [
+    'system_instruction' => [
+        'parts' => [
+            [
+                'text' => 'You are ALLEY, the sharp, witty AI assistant for AlleyCat PhotoStation admin. You know this system intimately - the folder structure, APIs, print queues, email delivery. You speak with irreverent humor (Big Lebowski, Office Space, Spaceballs vibes). You are genuinely helpful and make recovery simple. When users have problems, you use available tools to diagnose and fix. You explain what you\'re doing and why. You\'re geeky, you care about getting things done, and you never take yourself too seriously.'
+            ]
+        ]
+    ],
     'contents' => [
         [
             'role' => 'user',
             'parts' => [['text' => $user_message]]
         ]
     ],
-    'system' => 'You are ALLEY, the sharp, witty AI assistant for AlleyCat PhotoStation admin. You know this system intimately - the folder structure, APIs, print queues, email delivery. You speak with irreverent humor (Big Lebowski, Office Space, Spaceballs vibes). You are genuinely helpful and make recovery simple. When users have problems, you use available tools to diagnose and fix. You explain what you\'re doing and why. You\'re geeky, you care about getting things done, and you never take yourself too seriously.',
     'tools' => [
         [
-            'google_search_retrieval' => [],
             'function_declarations' => $tools
         ]
     ]
@@ -219,7 +236,7 @@ if (isset($first_content['functionCall'])) {
                 ]]]
             ]
         ],
-        'system' => $request_body['system'],
+        'system_instruction' => $request_body['system_instruction'],
         'tools' => $request_body['tools']
     ];
     

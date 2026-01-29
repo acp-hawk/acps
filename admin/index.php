@@ -14,6 +14,16 @@
 // ------------------------------------------------------------------- //
 //*********************************************************************//
 
+session_start();
+
+// Initialize session for ALLEY API access
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['user_id'] = 'admin_' . bin2hex(random_bytes(8));
+}
+if (!isset($_SESSION['user_role'])) {
+    $_SESSION['user_role'] = 'admin';
+}
+
 require_once("config.php");
 
 // --- Pending Cash Orders Scan (today only) --------------------------
@@ -1367,6 +1377,9 @@ $token = md5('unique_salt' . $timestamp);
     startRefreshTimer();
   })();
   </script>
+
+<!-- ALLEY Help Bubble Widget -->
+<?php include(__DIR__ . '/alley_bubble.html'); ?>
 
 </body>
 </html>
