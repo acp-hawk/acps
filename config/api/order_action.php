@@ -69,7 +69,7 @@ function acp_get_autoprint_status(): bool {
 
 function acp_watermark_image($source, $dest) {
     $logoPath = __DIR__ . '/../../public/assets/images/pixel.png';
-    $logo_to_use = null;
+    $logo_to_use = $logoPath;
     
     // Check LOCATION_LOGO env var first
     //if (!empty(getenv('LOCATION_LOGO'))) {

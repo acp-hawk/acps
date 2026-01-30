@@ -35,15 +35,15 @@ function acp_get_autoprint_status() {
 
 // Helper: Watermark Image
 function acp_watermark_image($source, $dest) {
-    $logoPath = __DIR__ . '/../../public/assets/images/alley_logo.png';
-    $logo_to_use = null;
+    $logoPath = __DIR__ . '/../../public/assets/images/pixel.png';
+    $logo_to_use = $logoPath;
     
-    if (!empty(getenv('LOCATION_LOGO'))) {
-        $env_logo = getenv('LOCATION_LOGO');
-        if (is_string($env_logo) && file_exists($env_logo)) {
-            $logo_to_use = $env_logo;
-        }
-    }
+    //if (!empty(getenv('LOCATION_LOGO'))) {
+    //    $env_logo = getenv('LOCATION_LOGO');
+    //    if (is_string($env_logo) && file_exists($env_logo)) {
+    //        $logo_to_use = $env_logo;
+    //    }
+    //}
     
     if (!$logo_to_use && file_exists($logoPath)) {
         $logo_to_use = $logoPath;
