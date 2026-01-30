@@ -472,6 +472,13 @@ function process_drive($order_id, $folder_path, $token, $archive_path = null) {
         'mimeType' => 'application/vnd.google-apps.folder'
     ];
     
+    // Use parent folder if defined in .env
+    $parent_id = getenv('GOOGLE_DRIVE_FOLDER_ID');
+    if ($parent_id) {
+        $folder_metadata['parents'] = [$parent_id];
+        acp_log_event($order_id, "DRIVE_PARENT_FOLDER: Using parent ID $parent_id");
+    }
+    
     $res = google_api_call($create_folder_url, "POST", $token, $folder_metadata);
     
     if ($res['code'] !== 200) {
@@ -489,6 +496,19 @@ function process_drive($order_id, $folder_path, $token, $archive_path = null) {
     
     $order_folder_id = $res['body']['id'];
     acp_log_event($order_id, "DRIVE_FOLDER_CREATED: id=$order_folder_id");
+    
+    // Set permissions so anyone with the link can view
+    $perm_url = "https://www.googleapis.com/drive/v3/files/$order_folder_id/permissions";
+    $perm_data = [
+        'role' => 'reader',
+        'type' => 'anyone'
+    ];
+    $perm_res = google_api_call($perm_url, "POST", $token, $perm_data);
+    if ($perm_res['code'] !== 200) {
+        acp_log_event($order_id, "DRIVE_PERMISSION_ERROR: HTTP {$perm_res['code']} - " . json_encode($perm_res['body'] ?? []));
+    } else {
+        acp_log_event($order_id, "DRIVE_PERMISSION_SUCCESS: Folder set to public view");
+    }
     
     // Upload each raw image file (NOT preview_grid) to the order folder
     $upload_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";

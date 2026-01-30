@@ -97,6 +97,32 @@ $new_folder_id = $result['id'];
 echo "✅ Folder created successfully!\n";
 echo "📁 Folder Name: " . $result['name'] . "\n";
 echo "🆔 Folder ID: $new_folder_id\n";
+
+// --- SET PERMISSIONS TO ANYONE WITH LINK ---
+echo "🔄 Setting permissions to 'anyone with link'...\n";
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, "https://www.googleapis.com/drive/v3/files/$new_folder_id/permissions");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "Authorization: Bearer $access_token",
+    "Content-Type: application/json",
+]);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+    'role' => 'reader',
+    'type' => 'anyone'
+]));
+
+$response = curl_exec($ch);
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+if ($http_code !== 200) {
+    echo "⚠️ WARNING: Failed to set permissions (HTTP $http_code)\n";
+} else {
+    echo "✅ Permissions set to 'anyone with link'!\n";
+}
+
 echo "🔗 Link: https://drive.google.com/drive/folders/$new_folder_id\n";
 
 // --- UPDATE .ENV FILE ---
