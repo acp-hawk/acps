@@ -74,10 +74,7 @@ function acp_watermark_image($source, $dest) {
     imagecopy($photo, $res_stamp, $pw - $target_w - 40, $ph - $target_h - 40, 0, 0, $target_w, $target_h);
     
     $success = imagejpeg($photo, $dest, 95);
-    
-    imagedestroy($photo);
-    imagedestroy($stamp);
-    imagedestroy($res_stamp);
+
     
     return $success;
 }
@@ -179,7 +176,7 @@ if ($paymentMethod === 'credit') {
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post_data));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     $response = curl_exec($ch);
-    curl_close($ch);
+
 
     // Parse Response (Format: "Y,123456,Approved" or "N,Error")
     $parts = explode(',', $response);
@@ -406,7 +403,7 @@ if ($isPaid) {
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 5);
                 curl_exec($ch);
-                curl_close($ch);
+
             }
         }
     }

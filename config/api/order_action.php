@@ -110,9 +110,7 @@ function acp_watermark_image($source, $dest) {
     
     $success = imagejpeg($photo, $dest, 95);
     
-    imagedestroy($photo);
-    imagedestroy($stamp);
-    imagedestroy($res_stamp);
+
     
     return $success;
 }
@@ -165,7 +163,7 @@ function acp_sync_log_to_master($location, $dateISO, $type, $count, $amount) {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 5);
         curl_exec($ch);
-        curl_close($ch);
+
     } else {
         @file_get_contents($url);
     }
@@ -283,7 +281,7 @@ function acp_send_digital_email($orderID): array {
         $body   = curl_exec($ch);
         $errNo  = curl_errno($ch);
         $errStr = curl_error($ch);
-        curl_close($ch);
+
 
         if ($errNo === 0 || $errNo === 28) {
             $ok = true; 
