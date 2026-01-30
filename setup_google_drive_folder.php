@@ -86,6 +86,30 @@ if (!empty($files)) {
     echo "✅ Created new folder with ID: $folder_id\n";
 }
 
+// Set permissions to "anyone with link"
+echo "Setting permissions to 'anyone with link' for folder: $folder_id\n";
+$ch = curl_init("https://www.googleapis.com/drive/v3/files/$folder_id/permissions");
+$perm_data = json_encode([
+    'role' => 'reader',
+    'type' => 'anyone'
+]);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, $perm_data);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "Authorization: Bearer $access_token",
+    "Content-Type: application/json"
+]);
+$perm_response = curl_exec($ch);
+$perm_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+if ($perm_code !== 200) {
+    echo "⚠️ Warning: Failed to set permissions (HTTP $perm_code). Response: $perm_response\n";
+} else {
+    echo "✅ Permissions set to 'anyone with link' successfully!\n";
+}
+
 // Update .env file
 $env_file = __DIR__ . '/.env';
 $env_content = file_get_contents($env_file);
