@@ -1,0 +1,56 @@
+{
+  "name": "alleycat-photostation-admin",
+  "version": "9.0.1",
+  "description": "ACPS90 - AlleyCat PhotoStation v9.0 - Event Photography Kiosk System",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.alleycatphoto.acps90",
+    "productName": "AlleyCat PhotoStation : Admin",
+    "files": [
+      "electron-main.js",
+      "electron-settings.html",
+      "electron-error.html",
+      "logo.png",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "logo.png"
+    }
+  },
+  "keywords": [
+    "photostation",
+    "alleycat",
+    "kiosk",
+    "event-photography",
+    "square-payments"
+  ],
+  "author": "AlleyCat Development Team <photos@alleycatphoto.net>",
+  "homepage": "https://alleycatphoto.net",
+  "bugs": {
+    "url": "https://github.com/alleycatphoto/acps-server/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "private": true,
+  "license": "Proprietary",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alleycatphoto/acps-server.git"
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "jquery": "^3.2.1"
+  },
+  "devDependencies": {
+    "electron": "^40.1.0",
+    "electron-builder": "^26.7.0"
+  }
+}

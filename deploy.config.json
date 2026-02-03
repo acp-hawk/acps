@@ -1,0 +1,37 @@
+{
+  "comment": "Dev repo: built-responsive/ACPS-8.0 | Production fork: alleycatphoto/acps-server",
+  "servers": {
+    "hawksnest": {
+      "name": "Hawks Nest Server (North Carolina)",
+      "hostname": "hawksnest.local",
+      "user": "Owner",
+      "path": "C:/UniServerZ/www",
+      "method": "ssh-trigger",
+      "notes": "Pulls from alleycatphoto/acps-server"
+    },
+    "hawkmoon": {
+      "name": "Hawk Moon Server",
+      "hostname": "hawkmoon.local",
+      "user": "Owner",
+      "path": "C:/UniServerZ/www",
+      "method": "ssh-trigger",
+      "notes": "Pulls from alleycatphoto/acps-server"
+    },
+    "zip": {
+      "name": "Zip Server",
+      "hostname": "zip.local",
+      "user": "Owner",
+      "path": "C:/UniServerZ/www",
+      "method": "ssh-trigger",
+      "notes": "Pulls from alleycatphoto/acps-server"
+    }
+  },
+  "github_secrets_needed": [
+    "ALLEYCATPHOTO_TOKEN (Personal Access Token for push to alleycatphoto/acps-server)",
+    "HAWK_HOST (Hawks Nest IP or hostname)",
+    "MOON_HOST (Hawk Moon IP or hostname)",
+    "ZIP_HOST (Zip server IP or hostname)",
+    "SERVER_PATH (C:/UniServerZ/www - same for all 3 servers)",
+    "CONPHOSERV_SSH_KEY (single SSH private key for user Owner on all 3 servers)"
+  ]
+}

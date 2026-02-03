@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AlleyCat Photo Admin : Connection Error</title>
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+        h1 { color: #c41e3a; text-transform: uppercase; }
+        p { color: #888; }
+        .btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #c41e3a;
+            color: white;
+            border: none;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        .btn:hover { background: #a01830; }
+    </style>
+</head>
+<body>
+    <h1>Connection Failed</h1>
+    <p>Could not connect to the AlleyCat Photo Admin Server.</p>
+    <p>Please ensure UniServerZ is running and Apache is started.</p>
+    <p>Target: http://localhost/admin/</p>
+    <button class="btn" onclick="window.location.reload()">Retry Connection</button>
+</body>
+</html>
