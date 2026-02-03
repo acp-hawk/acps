@@ -89,7 +89,7 @@ Content-Type: application/json
 
 **Required Variable:**
 ```ini
-GEMINI_API_KEY="AIzaSyBBkth-_DUv2xtHDEendzOlNy8sJRdYzT0"
+GEMINI_API_KEY="AIz.....YzT0"
 ```
 
 **Status:** Already added to `.env` ✅
