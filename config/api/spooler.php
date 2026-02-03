@@ -69,6 +69,7 @@ function log_print($log_file, $filename) {
 }
 
 function get_valid_token($credPath, $tokenPath) {
+    global $base_dir;
     if (!file_exists($tokenPath)) return null;
     $token = json_decode(file_get_contents($tokenPath), true);
     if (($token['created'] + ($token['expires_in'] ?? 3600) - 60) < time()) {
