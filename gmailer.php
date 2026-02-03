@@ -16,7 +16,7 @@ require_once __DIR__ . '/admin/config.php';
 require_once __DIR__ . '/config/api/google_auth_service.php'; // Add Service Account Helper
 $credentialsPath = __DIR__ . '/config/google/credentials.json';
 $tokenPath = __DIR__ . '/config/google/token.json';
-define('SENDER_EMAIL', 'moonshine@alleycatphoto.com');
+define('SENDER_EMAIL', getenv('LOCATION_EMAIL') ?: 'hawksnest@alleycatphoto.com');
 
 error_reporting(E_ALL);
 ini_set('log_errors', 1);
@@ -619,7 +619,7 @@ try {
 $logo_cid = "logo_img";
 $preview_cid = "preview_img";
 
-$copyrightText = "Dear Sir/Madam:\n\nThank you for your purchase from AlleycatPhoto. Enclosed with this correspondence are the digital image files you have acquired, along with this copyright release for your records. This letter confirms that you have purchased and paid in full for the rights to the accompanying photographs. AlleycatPhoto hereby grants you express written permission to use, reproduce, print, and distribute these digital files without limitation for personal or professional purposes. While AlleycatPhoto retains the original copyright ownership of the images, you are authorized to use them freely in any lawful manner you choose, without further obligation or restriction. We sincerely appreciate your business and trust in our work. Please retain this release for your records as proof of usage rights.\n\nSincerely,\nJosh Silva\nPresident\nAlleycatPhoto";
+$copyrightText = "Dear Sir/Madam:\n\nThank you for your purchase from " . getenv('LOCATION_NAME')  . " AlleycatPhoto. Enclosed with this correspondence are the digital image files you have acquired, along with this copyright release for your records. This letter confirms that you have purchased and paid in full for the rights to the accompanying photographs. AlleycatPhoto hereby grants you express written permission to use, reproduce, print, and distribute these digital files without limitation for personal or professional purposes. While AlleycatPhoto retains the original copyright ownership of the images, you are authorized to use them freely in any lawful manner you choose, without further obligation or restriction. We sincerely appreciate your business and trust in our work. Please retain this release for your records as proof of usage rights.\n\nSincerely,\nJosh Silva\nPresident\nAlleycatPhoto";
 
 $html = "
 <!DOCTYPE html>
@@ -643,7 +643,7 @@ $html = "
                     </tr>
                     <tr>
                         <td style='padding: 40px;'>
-                            <h1 style='margin: 0; font-size: 32px; color: #fff; font-weight: 800;'>Order #$order_id</h1>
+                            <h1 style='margin: 0; font-size: 32px; color: #fff; font-weight: 800;'>" . getenv('LOCATION_NAME')  . " Order #$order_id</h1>
                             <p style='margin: 5px 0 25px 0; color: #888; font-size: 16px;'>" . date('F j, Y') . "</p>
                             
                             <p style='font-size: 18px; line-height: 1.6; color: #bbb; margin-bottom: 25px;'>
@@ -670,7 +670,7 @@ $html = "
                     </tr>
                     <tr>
                         <td style='padding: 30px; background-color: #0f0f0f; border-top: 1px solid #333; text-align: center;'>
-                            <p style='margin: 0; color: #555; font-size: 14px;'>&copy; " . date('Y') . " Alley Cat Photo Station | <a href='https://alleycatphoto.net' style='color: #e70017; text-decoration: none; font-weight: 600;'>alleycatphoto.net</a></p>
+                            <p style='margin: 0; color: #555; font-size: 14px;'>&copy; " . date('Y') . " Alley Cat Photo Station | " . getenv('LOCATION_NAME')  . "<a href='https://alleycatphoto.net' style='color: #e70017; text-decoration: none; font-weight: 600;'>alleycatphoto.net</a></p>
                         </td>
                     </tr>
                 </table>
@@ -727,7 +727,7 @@ try {
     $body_mime .= "--$boundary--";
     acp_log_event($order_id, "EMAIL_MIME_COMPLETE: " . strlen($body_mime) . " bytes");
 
-    $full_raw = "To: $customer_email\r\nSubject: Your Photos from Alley Cat #$order_id\r\n" . $headers . "\r\n" . $body_mime;
+    $full_raw = "To: $customer_email\r\nSubject: Your Photos from " . getenv('LOCATION_NAME')  . " #$order_id\r\n" . $headers . "\r\n" . $body_mime;
     acp_log_event($order_id, "EMAIL_RAW_BUILT: " . strlen($full_raw) . " bytes");
     
     $encoded_msg = strtr(base64_encode($full_raw), ['+' => '-', '/' => '_']);
