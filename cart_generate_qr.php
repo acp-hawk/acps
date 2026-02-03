@@ -57,8 +57,9 @@ $cc_totaltaxed = $cc_total * 1.0675;
 // --- 3. Generate Reference ID (NOT an order number yet) ---
 // Use hostname-based reference: VS1-12345, MS-54321, etc.
 // The actual order ID will only be created in checkout.php when payment is confirmed
-$hostname = $_SERVER['HTTP_HOST'] ?? 'local';
-$stationPrefix = ($hostname == '192.168.2.126') ? 'FS' : 'MS';
+$remote_ip = $_SERVER['REMOTE_ADDR'] ?? '';
+$ip_fire = $_ENV['IP_FIRE'] ?? '192.168.2.126';
+$stationPrefix = ($remote_ip === $ip_fire) ? 'FS' : 'MS';
 $referenceNum = str_pad(rand(10000, 99999), 5, '0', STR_PAD_LEFT);
 $referenceId = $stationPrefix . '-' . $referenceNum;
 

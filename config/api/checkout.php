@@ -125,7 +125,7 @@ $date_path = date('Y/m/d');
 $dirname   = __DIR__ . "/../../photos/";
 $orderFile = $dirname . $date_path . "/orders.txt";
 
-if (!file_exists(dirname($orderFile))) mkdir(dirname($orderFile), 0777, true);
+if (!file_exists(dirname($orderFile))) @mkdir(dirname($orderFile), 0777, true);
 
 $fp = fopen($orderFile . ".lock", "c+");
 if (flock($fp, LOCK_EX)) {
@@ -195,8 +195,9 @@ if ($transaction_result !== 'approved') {
 }
 
 // --- 4. BUILD RECEIPT CONTENT ---
-$server_addy = $_SERVER['HTTP_HOST'] ?? '';
-$stationID   = ($server_addy == '192.168.2.126') ? "FS" : "MS";
+$remote_ip   = $_SERVER['REMOTE_ADDR'] ?? '';
+$ip_fire     = $_ENV['IP_FIRE'] ?? '192.168.2.126';
+$stationID   = ($remote_ip === $ip_fire) ? "FS" : "MS";
 $message     = "";
 $total_price = 0;
 
@@ -235,11 +236,11 @@ $message .= "-----------------------------\r\nVisit us online:\r\nhttp://www.all
 
 // --- 5. SAVE RECEIPT ---
 $receiptPath = $dirname . $date_path . "/receipts";
-if (!is_dir($receiptPath)) mkdir($receiptPath, 0777, true);
+if (!is_dir($receiptPath)) @mkdir($receiptPath, 0777, true);
 file_put_contents("$receiptPath/$orderID.txt", $message);
 
-$firePath = ($server_addy == '192.168.2.126') ? $dirname . "receipts/fire" : $dirname . "receipts";
-if (!is_dir($firePath)) mkdir($firePath, 0777, true);
+$firePath = ($remote_ip === $ip_fire) ? $dirname . "receipts/fire" : $dirname . "receipts";
+if (!is_dir($firePath)) @mkdir($firePath, 0777, true);
 file_put_contents("$firePath/$orderID.txt", $message);
 
 
@@ -344,7 +345,7 @@ if ($isPaid) {
                     for ($i = 1; $i <= $quantity; $i++) {
                         $filename = sprintf("%s-%s-%s%s-%d.jpg", $orderID, $photo_id, $prod_code, $orientation, $i);
                         acp_watermark_image($sourcefile, $printer_spool . $filename);
-                        usleep(100000); // 0.1 second delay between files to prevent printer overload
+                        usleep(250000); // 0.25 second delay between files to ensure FS/network write completes
                     }
                 }
             }

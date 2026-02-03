@@ -32,10 +32,12 @@ use Square\Types\DeviceCheckoutOptions;
 
 header('Content-Type: application/json');
 
-$server_addy = $_SERVER['HTTP_HOST'] ?? '';
+$remote_ip = $_SERVER['REMOTE_ADDR'] ?? '';
+$ip_fire = $_ENV['IP_FIRE'] ?? '192.168.2.126';
+
 // --- Configuration from .env ---
 $accessToken = getenv('SQUARE_ACCESS_TOKEN') ?: '';
-$deviceId = ($server_addy == '192.168.2.126') ? getenv('SQUARE_TERMINAL_ID_FIRE') : getenv('SQUARE_TERMINAL_ID');
+$deviceId = ($remote_ip === $ip_fire) ? getenv('SQUARE_TERMINAL_ID_FIRE') : getenv('SQUARE_TERMINAL_ID');
 //$deviceId    = getenv('SQUARE_TERMINAL_ID') ?: '';
 $environment = Environments::Production;
 

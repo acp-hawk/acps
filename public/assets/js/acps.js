@@ -349,6 +349,10 @@ function startQrPolling(squareOrderId) {
                     if (data.status === 'success') {
                         // Display big yellow order number
                         showOrderNumber(data.order_id);
+
+                        // Force clear cart via dedicated AJAX call for reliability
+                        $.post('cart_action.php?action=clear');
+
                         setTimeout(() => {
                             window.location.href = `thankyou.php?order=${data.order_id}&status=paid&onsite=${state.onsite}`;
                         }, 3000);

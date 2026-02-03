@@ -1252,7 +1252,7 @@ $token = md5('unique_salt' . $timestamp);
         autoprint: autoPrintOn ? '1' : '0' // Pass autoPrintOn state to backend
       });
 
-      fetch('/admin/admin_cash_order_action.php', {
+      fetch('/config/api/order_action.php', {
         method: 'POST',
         headers: {'Content-Type':'application/x-www-form-urlencoded'},
         body: payload.toString()
@@ -1379,7 +1379,7 @@ $token = md5('unique_salt' . $timestamp);
   </script>
 
 <!-- ALLEY Help Bubble Widget -->
-<?php // include(__DIR__ . '/alley_bubble.html'); ?>
+<?php  // include(__DIR__ . '/alley_bubble.html'); ?>
 
 </body>
 </html>

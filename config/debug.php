@@ -662,7 +662,7 @@ header('Content-Type: text/html; charset=utf-8');
             statusEl.innerHTML = '<span class="status-badge info">Processing...</span>';
 
             try {
-                const resp = await fetch('/admin/admin_cash_order_action.php', {
+                const resp = await fetch('/config/api/order_action.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({
@@ -694,7 +694,7 @@ header('Content-Type: text/html; charset=utf-8');
             statusEl.innerHTML = '<span class="status-badge info">Processing...</span>';
 
             try {
-                const resp = await fetch('/admin/admin_cash_order_action.php', {
+                const resp = await fetch('/config/api/order_action.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({
@@ -748,7 +748,7 @@ header('Content-Type: text/html; charset=utf-8');
             statusEl.innerHTML = '<span class="status-badge info">Processing cash payment...</span>';
 
             try {
-                const resp = await fetch('/admin/admin_cash_order_action.php', {
+                const resp = await fetch('/config/api/order_action.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({
@@ -786,7 +786,7 @@ header('Content-Type: text/html; charset=utf-8');
             statusEl.innerHTML = '<span class="status-badge info">Processing QR payment...</span>';
 
             try {
-                const resp = await fetch('/admin/admin_cash_order_action.php', {
+                const resp = await fetch('/config/api/order_action.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({
@@ -824,7 +824,7 @@ header('Content-Type: text/html; charset=utf-8');
             statusEl.innerHTML = '<span class="status-badge info">Processing terminal payment...</span>';
 
             try {
-                const resp = await fetch('/admin/admin_cash_order_action.php', {
+                const resp = await fetch('/config/api/order_action.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({

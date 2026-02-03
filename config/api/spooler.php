@@ -35,13 +35,13 @@ $receipt_hot_main = $base_dir . '/photos/receipts/';
 $receipt_hot_fire = $base_dir . '/photos/receipts/fire/';
 
 // Ensure directories exist
-if (!is_dir($printer_spool)) mkdir($printer_spool, 0777, true);
-if (!is_dir($mailer_spool)) mkdir($mailer_spool, 0777, true);
-if (!is_dir($completed_spool)) mkdir($completed_spool, 0777, true);
-if (!is_dir(dirname($print_log_file))) mkdir(dirname($print_log_file), 0777, true);
-if (!is_dir($receipt_hot_main)) mkdir($receipt_hot_main, 0777, true);
-if (!is_dir($receipt_hot_fire)) mkdir($receipt_hot_fire, 0777, true);
-if (!is_dir($physical_printer_path_fire)) mkdir($physical_printer_path_fire, 0777, true);
+if (!is_dir($printer_spool)) @mkdir($printer_spool, 0777, true);
+if (!is_dir($mailer_spool)) @mkdir($mailer_spool, 0777, true);
+if (!is_dir($completed_spool)) @mkdir($completed_spool, 0777, true);
+if (!is_dir(dirname($print_log_file))) @mkdir(dirname($print_log_file), 0777, true);
+if (!is_dir($receipt_hot_main)) @mkdir($receipt_hot_main, 0777, true);
+if (!is_dir($receipt_hot_fire)) @mkdir($receipt_hot_fire, 0777, true);
+if (!is_dir($physical_printer_path_fire)) @mkdir($physical_printer_path_fire, 0777, true);
 
 $action = $_GET['action'] ?? 'status';
 
@@ -177,6 +177,7 @@ switch ($action) {
         break;
 
     case 'tick_printer':
+        clearstatcache(); // Ensure we have the latest file status to prevent race conditions
         // Check both hot folders
         $current_printer_files_main = file_exists($physical_printer_path) ? array_diff(scandir($physical_printer_path), array('.', '..', 'Archive', 'archive', 'Thumbs.db')) : [];
         $current_printer_files_fire = file_exists($physical_printer_path_fire) ? array_diff(scandir($physical_printer_path_fire), array('.', '..', 'Archive', 'archive', 'Thumbs.db')) : [];
@@ -190,7 +191,7 @@ switch ($action) {
         
         $jpgs = array_filter($queued_files, function($f) { return stripos($f, '.jpg') !== false; });
         
-        $moved_file = null;
+        $moved_files = [];
 
         if (count($jpgs) > 0) {
             foreach ($jpgs as $file_to_move) {
@@ -199,53 +200,60 @@ switch ($action) {
                 $order_id = $parts[0];
                 $txt_file = $printer_spool . $order_id . ".txt";
                 
-                $is_fire = false;
-                if (file_exists($txt_file)) {
-                    $content = file_get_contents($txt_file);
-                    if (strpos($content, '- FS') !== false || strpos($content, 'Fire Station') !== false) {
-                        $is_fire = true;
+                // --- Defensive Check for TXT file ---
+                if (!file_exists($txt_file) || filesize($txt_file) === 0) {
+                    // As a last resort, try the fallback recovery. Check today AND yesterday for midnight rollovers.
+                    $receipt_file_today = __DIR__ . '/../../photos/' . date('Y/m/d') . "/receipts/$order_id.txt";
+                    $receipt_file_yesterday = __DIR__ . '/../../photos/' . date('Y/m/d', strtotime('-1 day')) . "/receipts/$order_id.txt";
+                    
+                    $receipt_to_copy = null;
+                    if (file_exists($receipt_file_today)) {
+                        $receipt_to_copy = $receipt_file_today;
+                    } elseif (file_exists($receipt_file_yesterday)) {
+                        $receipt_to_copy = $receipt_file_yesterday;
                     }
-                } else {
-                    // TXT file not found yet (race condition during checkout)
-                    // Try to create from receipt as fallback recovery
-                    $receipt_file = __DIR__ . '/../../photos/' . date('Y/m/d') . "/receipts/$order_id.txt";
-                    if (file_exists($receipt_file)) {
-                        // Copy receipt as TXT metadata for spooler
-                        @copy($receipt_file, $txt_file);
-                        $content = file_get_contents($txt_file);
-                        if (strpos($content, '- FS') !== false) {
-                            $is_fire = true;
-                        }
-                    } else {
-                        // No receipt either - skip and retry next tick
-                        continue;
+            
+                    if ($receipt_to_copy) {
+                        @copy($receipt_to_copy, $txt_file);
                     }
+                    
+                    // CRITICAL: Even if we attempted recovery, we wait for the next tick to process.
+                    error_log("Spooler Warning: TXT for Order {$order_id} was missing/empty. Attempted recovery. Will re-process on next tick.");
+                    continue; 
                 }
+
+                $content = file_get_contents($txt_file);
+                if ($content === false) {
+                    error_log("Spooler Error: Could not read TXT for Order {$order_id} despite it existing. Skipping.");
+                    continue;
+                }
+
+                $is_fire = (strpos($content, '- FS') !== false || strpos($content, 'Fire Station') !== false);
 
                 if ($is_fire) {
                     if (!$fire_busy) {
                         $dest = $physical_printer_path_fire . $file_to_move;
                         if (@rename($printer_spool . $file_to_move, $dest)) {
                             log_print($print_log_file, $file_to_move);
-                            $moved_file = $file_to_move;
-                            echo json_encode(['status' => 'success', 'moved' => $file_to_move, 'station' => 'Fire']);
-                            break; // Process one at a time
+                            $moved_files[] = ['file' => $file_to_move, 'station' => 'Fire'];
+                            usleep(250000); // 0.25s delay to guarantee FS/Network write completes
                         }
                     }
-                } else {
+                } else { // Not a fire station order
                     if (!$main_busy) {
                         $dest = $physical_printer_path . $file_to_move;
                         if (@rename($printer_spool . $file_to_move, $dest)) {
                             log_print($print_log_file, $file_to_move);
-                            $moved_file = $file_to_move;
-                            echo json_encode(['status' => 'success', 'moved' => $file_to_move, 'station' => 'Main']);
-                            break; // Process one at a time
+                            $moved_files[] = ['file' => $file_to_move, 'station' => 'Main'];
+                            usleep(250000); // 0.25s delay to guarantee FS/Network write completes
                         }
                     }
                 }
             }
             
-            if (!$moved_file) {
+            if (count($moved_files) > 0) {
+                 echo json_encode(['status' => 'success', 'moved' => $moved_files]);
+            } else {
                  echo json_encode(['status' => 'busy', 'main_count' => count($current_printer_files_main), 'fire_count' => count($current_printer_files_fire)]);
             }
 
@@ -339,8 +347,9 @@ switch ($action) {
 
         // Logic for Fire Station vs Main Station
         $is_fire = false;
-        $ip = $_SERVER['REMOTE_ADDR'];
-        if ($ip === '192.168.2.126') {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        $ip_fire = $_ENV['IP_FIRE'] ?? '192.168.2.126';
+        if ($ip === $ip_fire) {
             $is_fire = true;
         } else {
             $content = file_get_contents($receipt_src);
@@ -365,7 +374,7 @@ switch ($action) {
         $parts = explode('-', $filename); 
         if (count($parts) < 2) die(json_encode(['status'=>'error', 'message'=>'Invalid filename format']));
         $photo_id = $parts[1];
-        $raw_path = $date_path_rel . "raw/" . $photo_id . ".jpg";
+        $raw_path = $base_dir . "/photos/" . $date_path . "/raw/" . $photo_id . ".jpg";
         if (file_exists($raw_path)) {
             if (copy($raw_path, $printer_spool . $filename)) {
                 echo json_encode(['status' => 'success', 'message' => "Re-spooled $filename"]);

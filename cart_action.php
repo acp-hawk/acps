@@ -21,6 +21,23 @@ include('shopping_cart.class.php');
 session_start();
 $Cart = new Shopping_Cart('shopping_cart');
 
+$action = $_GET['action'] ?? '';
+
+if ($action === 'clear') {
+    $Cart->clearCart();
+    // Log this critical action
+    $log_file = __DIR__ . '/logs/cart_actions.log';
+    if (!is_dir(dirname($log_file))) @mkdir(dirname($log_file), 0777, true);
+    $timestamp = date('Y-m-d H:i:s');
+    $log_entry = "[{$timestamp}] Cart cleared via cart_action.php | Session ID: " . session_id() . "\n";
+    @file_put_contents($log_file, $log_entry, FILE_APPEND);
+    
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'success', 'message' => 'Cart cleared']);
+    exit;
+}
+
+
 if ( !empty($_GET['order_code']) && !empty($_GET['quantity']) ) {
 	// When adding/updating from modal, set quantity directly (don't add to existing)
 	$Cart->setItemQuantity($_GET['order_code'], $_GET['quantity']);

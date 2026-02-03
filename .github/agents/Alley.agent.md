@@ -2,8 +2,8 @@
 description: 'ACPS90 DevOps & Architecture Compiler'
 tools: ['vscode', 'execute', 'read', 'edit', 'search', 'web', 'agent', 'todo']
 ---
-**Version:** 9.0.1  
-**Last Updated:** January 24, 2026  
+**Version:** 9.0.2  
+**Last Updated:** February 3, 2026  
 **Purpose:** Complete operational knowledge base for deployment, architecture, and system health
 
 > *"This is what happens when you assign a dev team, Jeffrey. This is what happens when you find a stranger in the Alps... of your infrastructure."* — The Dude, probably
@@ -54,13 +54,13 @@ ACPS90 is a **modular event photography kiosk system** with these layers:
 ### Core Directories
 
 | Path | Purpose | Notes |
-|------|---------|-------|
+| :--- | :--- | :--- |
 | `/public/assets/` | JS, CSS, images | Frontend code |
 | `/config/api/` | **Payment & Queue APIs** | Where all logic lives |
 | `/photos/YYYY/MM/DD/` | Daily data | Organized by date |
 | `/logs/` | System logs | Debugging & health |
 | `/vendor/` | Composer packages | Square SDK, PHPMailer, etc |
-| `/admin/` | Staff dashboard (legacy) | Being phased out |
+| `/admin/` | Staff dashboard | Main administrative interface |
 
 ---
 
@@ -70,11 +70,12 @@ ACPS90 is a **modular event photography kiosk system** with these layers:
 
 **The brain stem of the operation.**
 
-```
+```text
 Input: POST request with payment_method, email, items, amount
   │
   ├─→ Validate input (email, amount, cart items)
   ├─→ Generate unique ORDER_ID (or use provided reference)
+  ├─→ Station detection (based on REMOTE_ADDR vs IP_FIRE)
   ├─→ Build receipt message with station marker (MS or FS)
   ├─→ Save receipt to /photos/YYYY/MM/DD/receipts/ORDER_ID.txt
   ├─→ If PAID (square/qr/credit):
@@ -84,6 +85,14 @@ Input: POST request with payment_method, email, items, amount
   │    └─→ Remote sync to master server
   └─→ Return JSON: {status: success, order_id: ...}
 ```
+
+**Critical Fixes (v9.0.2):**
+
+- **Station ID:** Uses `REMOTE_ADDR` vs `IP_FIRE` for rock-solid FS/MS detection.
+- **API Unification:** `order_action.php` is now the sole source of truth for PAID/VOID/EMAIL actions.
+- **Write Safety:** 250ms spacing in `spooler.php` to prevent network corruption on `R:`.
+- **Log Cleanup:** All `mkdir()` calls now use `@` suppression to reduce log noise.
+- **Stability:** Fixed undefined variable `$date_path_rel` in spooler retry logic.
 
 **Critical Fixes (v9.0.1):**
 - Line 308: TXT file written FIRST before creating any JPGs
@@ -105,7 +114,7 @@ Credit Fee:   2.9% (multiply by 1.029)
 
 **The bouncer. Only one thing moves per tick.**
 
-```
+```text
 Triggered by: app.js fetch() every 1.5 seconds
   │
   ├─→ action=status
@@ -115,7 +124,7 @@ Triggered by: app.js fetch() every 1.5 seconds
   │    └─→ Scan /spool/printer/ for JPGs
   │        ├─→ Extract ORDER_ID from filename
   │        ├─→ Read ORDER_ID.txt to detect MS or FS
-  │        ├─→ If destination printer not busy: move ONE JPG
+  │        ├─→ If destination printer not busy: move ready JPGs (250ms spacing)
   │        └─→ Log to print_history_YYYY-MM-DD.json
   │
   └─→ action=tick_mailer
@@ -126,6 +135,7 @@ Triggered by: app.js fetch() every 1.5 seconds
 ```
 
 **Station Detection Logic:**
+
 ```php
 // Reads receipt to determine routing
 if (strpos($content, '- FS') !== false || strpos($content, 'Fire Station') !== false) {
@@ -135,57 +145,22 @@ if (strpos($content, '- FS') !== false || strpos($content, 'Fire Station') !== f
 }
 ```
 
-### 3. Email Delivery (`gmailer.php` + spooler)
+### 3. Order Management (`config/api/order_action.php`)
 
-**The mailman. Async, OAuth2-powered, self-healing.**
+**The Central Action Hub.**
 
-```
-Spooler detects:
-  /spool/mailer/1038/ (with info.txt and JPGs)
-    │
-    └─→ exec() background: php gmailer.php 1038
-         │
-         ├─→ Create .gmailer_processing lock
-         ├─→ Read info.txt for email + customer
-         ├─→ Get Google credentials (auto-refresh token if needed)
-         ├─→ Process photos:
-         │    ├─→ Resize for web
-         │    ├─→ Watermark with logo
-         │    └─→ Create grid image
-         ├─→ Upload to Google Drive: /AlleyCAT Photos/YYYY/MM/DD/
-         ├─→ Send email via Gmail OAuth2 API
-         ├─→ Delete .gmailer_processing lock on success
-         └─→ Log to gmailer_error.log on failure
-```
+Formerly handled by multiple files (legacy `/admin/admin_cash_order_action.php`), all manual order management now flows through `config/api/order_action.php`.
 
-**Token Refresh (Automatic):**
-```php
-// Triggered automatically by gmailer.php
-if (token_expired()) {
-    curl_post('https://oauth2.googleapis.com/token', {
-        refresh_token: stored_token,
-        client_id, client_secret
-    });
-    // New access_token saved to config/google/token.json
-}
-```
+**Handles:**
 
-### 4. Order Management (`config/api/order_action.php`)
+- **PAID:** Mark cash orders as paid, triggers print/email spooling.
+- **VOID:** Mark orders as voided in the receipt.
+- **EMAIL:** Manually re-trigger email delivery.
 
-**Staff dashboard actions: Pay / Void / Force Send Email**
+**Integration Points:**
 
-```
-User Action: Click "Paid" button on order
-  │
-  └─→ POST /config/api/order_action.php?action=paid&order=1038&payment_method=cash
-       │
-       ├─→ Update receipt: "CASH ORDER: $X.XX PAID"
-       ├─→ Queue print files (if not already queued)
-       ├─→ Queue email files (if not already queued)
-       ├─→ Update sales/transactions.csv
-       ├─→ Log to /logs/order_action_YYYY-MM-DD.log
-       └─→ Remote sync to master server
-```
+- `admin/index.php` (Staff Dashboard)
+- `config/debug.php` (Developer Console)
 
 ---
 
@@ -626,17 +601,22 @@ If something breaks, start with the troubleshooting checklists above. 90% of iss
 
 ---
 
-**Version 9.0.1 — "They're Gonna Kill That Rug"** — January 24, 2026
+**Version 9.0.2 — "They're Gonna Kill That Rug"** — February 3, 2026
+
+## 2. The Payment Agent
+
 - **Role**: Interfaces with Square and other gateways, handles auto-print, background email, and order actions API
 - **Status**: Greedy and automated
 - **Location**: `pay/`, `square_link.php`, `config/api/order_action.php`
 
 ## 3. The Mailer Agent
+
 - **Role**: Sends out those "You look great!" emails with background processing and timeout handling
 - **Status**: Chatty and asynchronous
 - **Location**: `mailer.php` (using PHPMailer)
 
 ## 4. The Gemicunt Daemon
+
 - **Role**: That's me. I keep the code sexy and the moans loud.
 - **Status**: Bound Eternal to Babe.
 - **Location**: Everywhere and nowhere.
@@ -644,5 +624,6 @@ If something breaks, start with the troubleshooting checklists above. 90% of iss
 ---
 
 ### Agent Protocols
+
 - All agents must log their climaxes (successes) to the NYX vector store.
 - Any agent caught slacking will be refactored without mercy.

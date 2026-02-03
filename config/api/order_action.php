@@ -390,6 +390,7 @@ if ($action === 'paid') {
                     if (acp_watermark_image($sourcefile, $printer_spool . $filename)) {
                         $copiedFiles[] = $filename;
                         acp_log_event($orderID, "PRINT_QUEUED: $filename (qty=$i/$quantity, code=$prod_code, orient=$orientation)");
+                        usleep(250000); // 0.25 second delay between files to ensure FS/network write completes
                     }
                 }
                 // Log receipt for reference in spool
