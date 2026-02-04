@@ -2,6 +2,10 @@
 
 > *"The Dude abides, and so does version control."*
 
+## 9.0.3 - 2026-02-03 (EMERGENCY HOTFIX)
+
+- **FIX**: Updated station identification logic in `checkout.php` and `spooler.php` to check `HTTP_HOST` in addition to `REMOTE_ADDR` against `IP_FIRE` to correctly identify Fire Station kiosks during self-initiated calls.
+
 ## [2026-02-03] - v9.0.2 - Fire Station Routing & Centralized Actions Fix
 
 ### CRITICAL FIXES

@@ -196,8 +196,9 @@ if ($transaction_result !== 'approved') {
 
 // --- 4. BUILD RECEIPT CONTENT ---
 $remote_ip   = $_SERVER['REMOTE_ADDR'] ?? '';
+$http_host   = $_SERVER['HTTP_HOST'] ?? '';
 $ip_fire     = $_ENV['IP_FIRE'] ?? '192.168.2.126';
-$stationID   = ($remote_ip === $ip_fire) ? "FS" : "MS";
+$stationID   = ($remote_ip === $ip_fire || $http_host === $ip_fire) ? "FS" : "MS";
 $message     = "";
 $total_price = 0;
 
@@ -239,7 +240,7 @@ $receiptPath = $dirname . $date_path . "/receipts";
 if (!is_dir($receiptPath)) @mkdir($receiptPath, 0777, true);
 file_put_contents("$receiptPath/$orderID.txt", $message);
 
-$firePath = ($remote_ip === $ip_fire) ? $dirname . "receipts/fire" : $dirname . "receipts";
+$firePath = ($stationID === 'FS') ? $dirname . "receipts/fire" : $dirname . "receipts";
 if (!is_dir($firePath)) @mkdir($firePath, 0777, true);
 file_put_contents("$firePath/$orderID.txt", $message);
 

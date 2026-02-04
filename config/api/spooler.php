@@ -348,8 +348,9 @@ switch ($action) {
         // Logic for Fire Station vs Main Station
         $is_fire = false;
         $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        $host = $_SERVER['HTTP_HOST'] ?? '';
         $ip_fire = $_ENV['IP_FIRE'] ?? '192.168.2.126';
-        if ($ip === $ip_fire) {
+        if ($ip === $ip_fire || $host === $ip_fire) {
             $is_fire = true;
         } else {
             $content = file_get_contents($receipt_src);
