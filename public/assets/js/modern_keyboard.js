@@ -1,10 +1,10 @@
-(function() {
+(function () {
     const DOMAINS = ['@gmail.com', '@yahoo.com', '@outlook.com', '@hotmail.com', '@icloud.com'];
     const ROWS = [
         ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
         ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
         ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
-        ['z', 'x', 'c', 'v', 'b', 'n', 'm', '.', '@', '-', '_']
+        ['z', 'x', 'c', 'v', 'b', 'n', 'm', '.', '@', '.com', '-', '_']
     ];
 
     let activeInput = null;
@@ -40,18 +40,18 @@
 
         // Action Row
         html += '<div class="mk-row" style="margin-top: 0.5rem;">';
-        
+
         // Space
         html += `<button class="mk-key mk-key-space" data-action="space">SPACE</button>`;
-        
+
         // Backspace (Lucide Delete Icon SVG)
         const deleteIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>`;
         html += `<button class="mk-key mk-key-action mk-key-delete" data-action="backspace">${deleteIcon}</button>`;
-        
+
         // Submit (Lucide Check Icon SVG)
         const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
         html += `<button class="mk-key mk-key-submit" data-action="submit">${checkIcon}</button>`;
-        
+
         html += '</div>'; // End Action Row
         html += '</div>'; // End Grid
 
@@ -70,7 +70,7 @@
             btn.addEventListener(eventType, (e) => {
                 e.preventDefault();
                 e.stopPropagation(); // Prevent losing focus if we were careful, but we might need to re-focus
-                
+
                 const key = btn.getAttribute('data-key');
                 const action = btn.getAttribute('data-action');
 
@@ -88,15 +88,15 @@
 
         // Insert char
         activeInput.value = val.substring(0, start) + char + val.substring(end);
-        
+
         // Move cursor
         const newPos = start + char.length;
         try {
             activeInput.setSelectionRange(newPos, newPos);
-        } catch(e) {
+        } catch (e) {
             // Ignore for email types etc if they fail
         }
-        
+
         activeInput.focus();
         // Trigger change event for listeners
         $(activeInput).trigger('change');
@@ -120,15 +120,15 @@
                 activeInput.value = val.substring(0, start - 1) + val.substring(end);
                 try {
                     activeInput.setSelectionRange(start - 1, start - 1);
-                } catch(e) {}
+                } catch (e) { }
             } else {
                 // Remove selection
                 activeInput.value = val.substring(0, start) + val.substring(end);
                 try {
                     activeInput.setSelectionRange(start, start);
-                } catch(e) {}
+                } catch (e) { }
             }
-        } 
+        }
         else if (action === 'space') {
             handleKey(' ');
         }
@@ -144,7 +144,7 @@
             }
             hide(); // Hide keyboard after submit
         }
-        
+
         // activeInput.focus(); // Do not refocus after submit
         $(activeInput).trigger('change');
     }
@@ -160,7 +160,7 @@
             if (shortcuts) {
                 // Check if activeInput exists and is email-like
                 const isEmail = activeInput && (
-                    (activeInput.type && activeInput.type.toLowerCase() === 'email') || 
+                    (activeInput.type && activeInput.type.toLowerCase() === 'email') ||
                     (activeInput.id && activeInput.id.indexOf('email') !== -1)
                 );
 
@@ -171,7 +171,7 @@
                 }
             }
         }
-        document.body.classList.add('keyboard-open'); 
+        document.body.classList.add('keyboard-open');
         isVisible = true;
     }
 
@@ -183,11 +183,11 @@
     }
 
     // --- Initialization ---
-    window.initModernKeyboard = function() {
+    window.initModernKeyboard = function () {
         renderKeyboard();
 
         // Attach to inputs
-        $('input[type="text"], input[type="email"], input[type="number"]').on('focus', function() {
+        $('input[type="text"], input[type="email"], input[type="number"]').on('focus', function () {
             activeInput = this;
             show();
         });
@@ -211,10 +211,10 @@
     // Compatibility Layer for acps.js legacy calls
     window.jsKeyboard = {
         hide: hide,
-        init: function() { /* Already handled by ModernKeyboard init */ }
+        init: function () { /* Already handled by ModernKeyboard init */ }
     };
 
-    $(document).ready(function() {
+    $(document).ready(function () {
         window.initModernKeyboard();
     });
 

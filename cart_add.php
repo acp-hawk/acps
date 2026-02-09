@@ -659,6 +659,14 @@ foreach ($Cart->getItems() as $code=>$q){
         document.getElementById('p8x10').textContent = '$' + t8.toFixed(2);
         
         document.getElementById('subtotal-val').textContent = '$' + total.toFixed(2);
+
+        // Disable button if total is 0
+        const submitBtn = document.getElementById('submitBtn');
+        if (total <= 0) {
+            submitBtn.disabled = true;
+        } else {
+            submitBtn.disabled = false;
+        }
     }
 
     // Prevent duplicate submissions and close modal after form submission

@@ -17,10 +17,12 @@
     padding: 0.5rem;
     padding-bottom: 1rem;
     z-index: 200;
-    box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
-    transform: translateY(100%); /* Hidden by default */
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+    transform: translateY(100%);
+    /* Hidden by default */
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    display: block; /* Always part of DOM, just moved */
+    display: block;
+    /* Always part of DOM, just moved */
 }
 
 #virtualKeyboard.active {
@@ -30,12 +32,14 @@
 /* Close Button */
 .mk-close-btn {
     position: absolute;
-    top: -1.5rem; /* Peeking out or just inside */
+    top: -1.5rem;
+    /* Peeking out or just inside */
     right: 0.5rem;
     background: var(--brand-red);
     color: white;
     border: none;
-    border-radius: 50%; /* Circle */
+    border-radius: 50%;
+    /* Circle */
     width: 2rem;
     height: 2rem;
     display: flex;
@@ -43,10 +47,11 @@
     justify-content: center;
     font-weight: bold;
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
     z-index: 201;
-    transform: translateY(-50%); /* Half overlapping border */
-    
+    transform: translateY(-50%);
+    /* Half overlapping border */
+
     /* Hide by default when keyboard is down */
     opacity: 0;
     pointer-events: none;
@@ -56,10 +61,13 @@
 #virtualKeyboard.active .mk-close-btn {
     opacity: 1;
     pointer-events: auto;
-    transition-delay: 0.1s; /* Wait for slide up slightly */
+    transition-delay: 0.1s;
+    /* Wait for slide up slightly */
 }
 
-.mk-close-btn:hover { background-color: #a00000; }
+.mk-close-btn:hover {
+    background-color: #a00000;
+}
 
 /* Domain Shortcuts Row */
 .mk-shortcuts {
@@ -68,9 +76,15 @@
     overflow-x: auto;
     padding-bottom: 0.5rem;
     justify-content: center;
-    scrollbar-width: none; /* Firefox */
+    scrollbar-width: none;
+    /* Firefox */
 }
-.mk-shortcuts::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+.mk-shortcuts::-webkit-scrollbar {
+    display: none;
+}
+
+/* Chrome/Safari */
 
 .mk-btn-shortcut {
     padding: 0.4rem 0.75rem;
@@ -91,6 +105,7 @@
     border-color: var(--brand-red);
     color: white;
 }
+
 .mk-btn-shortcut:active {
     background-color: var(--brand-red);
     color: white;
@@ -119,7 +134,7 @@
     border: 1px solid #333;
     border-radius: 0.5rem;
     color: var(--text-color);
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: bold;
     text-transform: uppercase;
     cursor: pointer;
@@ -127,14 +142,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 @media (min-width: 640px) {
     .mk-key {
         width: 3.5rem;
         height: 3.5rem;
-        font-size: 1.35rem;
+        font-size: 1rem;
     }
 }
 
@@ -160,9 +175,11 @@
     background-color: var(--brand-dark-2);
     border-color: #333;
 }
+
 .mk-key-delete {
     color: var(--brand-red);
 }
+
 .mk-key-submit {
     width: 5rem;
     background-color: var(--brand-red);
@@ -170,6 +187,7 @@
     border: none;
     box-shadow: 0 0 15px rgba(153, 0, 0, 0.4);
 }
+
 .mk-key-submit:active {
     background-color: #a00000;
 }
