@@ -307,10 +307,7 @@ foreach ($images as $image) {
             }
             //touch($firePath2, date_timestamp_get($importDateTime));
 			unset($exif);
-			
-			// Free up memory
-			imagedestroy($im);
-			imagedestroy($virtualImage);
+
 
             // Increment processed counter
             $processed++;

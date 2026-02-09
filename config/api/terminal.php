@@ -32,7 +32,7 @@ use Square\Types\DeviceCheckoutOptions;
 
 header('Content-Type: application/json');
 
-$remote_ip = $_SERVER['REMOTE_ADDR'] ?? '';
+$remote_ip = $_SERVER['HTTP_HOST'] ?? '';
 $ip_fire = $_ENV['IP_FIRE'] ?? '192.168.2.126';
 
 // --- Configuration from .env ---

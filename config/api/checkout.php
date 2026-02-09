@@ -73,7 +73,7 @@ function acp_watermark_image($source, $dest) {
     
     imagecopy($photo, $res_stamp, $pw - $target_w - 40, $ph - $target_h - 40, 0, 0, $target_w, $target_h);
     
-    $success = imagejpeg($photo, $dest, 95);
+    $success = imagejpeg($photo, $dest, 85);
 
     
     return $success;

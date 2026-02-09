@@ -25,7 +25,7 @@ $printer_spool = $spool_base . 'printer/';
 $mailer_spool = $spool_base . 'mailer/';
 $completed_spool = $spool_base . 'completed/';
 $physical_printer_path = $_ENV['PRINTER_HOTFOLDER_MAIN'] ?? 'c:/orders/';
-$physical_printer_path_fire = $_ENV['PRINTER_HOTFOLDER_FIRE'] ?? 'C:/orders/';
+$physical_printer_path_fire = $_ENV['PRINTER_HOTFOLDER_FIRE'] ?? 'R:/orders/';
 $print_log_file = $base_dir . '/logs/print_history_' . date("Y-m-d") . '.json';
 $credentialsPath = $base_dir . '/config/google/credentials.json';
 $tokenPath = $base_dir . '/config/google/token.json';
@@ -218,7 +218,7 @@ switch ($action) {
                     }
                     
                     // CRITICAL: Even if we attempted recovery, we wait for the next tick to process.
-                    error_log("Spooler Warning: TXT for Order {$order_id} was missing/empty. Attempted recovery. Will re-process on next tick.");
+                    error_log("Spooler Warning: TXT for Order {$order_id} was missing/empty. {$receipt_file_today} Attempted recovery. Will re-process on next tick.");
                     continue; 
                 }
 
@@ -228,7 +228,7 @@ switch ($action) {
                     continue;
                 }
 
-                $is_fire = (strpos($content, '- FS') !== false || strpos($content, 'Fire Station') !== false);
+                $is_fire = (strpos($content, ' FS') !== false || strpos($content, 'Fire Station') !== false);
 
                 if ($is_fire) {
                     if (!$fire_busy) {
@@ -236,7 +236,7 @@ switch ($action) {
                         if (@rename($printer_spool . $file_to_move, $dest)) {
                             log_print($print_log_file, $file_to_move);
                             $moved_files[] = ['file' => $file_to_move, 'station' => 'Fire'];
-                            usleep(250000); // 0.25s delay to guarantee FS/Network write completes
+                            usleep(500000); // 0.25s delay to guarantee FS/Network write completes
                         }
                     }
                 } else { // Not a fire station order
@@ -245,7 +245,7 @@ switch ($action) {
                         if (@rename($printer_spool . $file_to_move, $dest)) {
                             log_print($print_log_file, $file_to_move);
                             $moved_files[] = ['file' => $file_to_move, 'station' => 'Main'];
-                            usleep(250000); // 0.25s delay to guarantee FS/Network write completes
+                            usleep(500000); // 0.25s delay to guarantee FS/Network write completes
                         }
                     }
                 }
