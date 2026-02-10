@@ -102,7 +102,7 @@ $locMeta = [
     'ZipnSlip'      => ['color' => '#00f2ff', 'logo' => 'https://alleycatphoto.net/assets/zipnslip.png'],
 ];
 
-// 4. Handle Manual Cash Injection
+// 4. Handle Manual Cash Injection (Atomic Locking)
 if (isset($_GET['loc']) || isset($_GET['location'])) {
     if (isset($_GET['cash'])) {
         $locId = $_GET['loc'] ?? $_GET['location'];
@@ -115,14 +115,28 @@ if (isset($_GET['loc']) || isset($_GET['location'])) {
             : date('Y-m-d', strtotime($dateRaw));
 
         $dbFile = $projectRoot . '/manual_cash.json';
-        $manualData = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
-        if (!isset($manualData[$lName])) $manualData[$lName] = [];
-        $manualData[$lName][$dateISO] = $cashAmt; 
         
-        file_put_contents($dbFile, json_encode($manualData));
+        // Atomic Read-Update-Write Ritual
+        $fp = fopen($dbFile, "c+");
+        if (flock($fp, LOCK_EX)) {
+            $currentSize = filesize($dbFile);
+            $manualData = ($currentSize > 0) ? json_decode(fread($fp, $currentSize), true) : [];
+            if (!isset($manualData[$lName])) $manualData[$lName] = [];
+            $manualData[$lName][$dateISO] = $cashAmt;
+            
+            ftruncate($fp, 0);
+            rewind($fp);
+            fwrite($fp, json_encode($manualData));
+            fflush($fp);
+            flock($fp, LOCK_UN);
+        }
+        fclose($fp);
+
         if (!isset($_GET['silent'])) {
             header('Location: ' . strtok($_SERVER["REQUEST_URI"], '?'));
             exit;
+        } else {
+            die("ACK: $lName $dateISO saved.");
         }
     }
 }
@@ -240,12 +254,40 @@ if (($_ENV['DEBUG'] ?? 'false') === 'true' && !empty($errorMsg)) {
     error_log("[DAEMON: Gemicunt] :: ERROR :: " . $errorMsg);
 }
 
-// 3. Load and Merge Manual Cash (With aggressive consolidation)
+// 3. Load, Normalize, and Consolidate Manual Cash
 $dbFile = $projectRoot . '/manual_cash.json';
-$manualDataRaw = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
+$rawJson = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
+$manualDataNormalized = [];
+$cleanupRequired = false;
 
-foreach ($manualDataRaw as $rawLoc => $dateMap) {
-    $lName = getNormalizedLocationName($rawLoc, $syncMap);
+// Self-Healing Normalization
+if (is_array($rawJson)) {
+    foreach ($rawJson as $rawLoc => $dateMap) {
+        $lNameNormalized = getNormalizedLocationName($rawLoc, $syncMap);
+        if ($lNameNormalized !== $rawLoc) $cleanupRequired = true;
+        
+        if (!isset($manualDataNormalized[$lNameNormalized])) {
+            $manualDataNormalized[$lNameNormalized] = [];
+        }
+        
+        foreach ($dateMap as $dateISO => $amt) {
+            // Merge existing data instead of overwriting to handle split keys in JSON
+            if (!isset($manualDataNormalized[$lNameNormalized][$dateISO])) {
+                $manualDataNormalized[$lNameNormalized][$dateISO] = 0;
+            }
+            // Record highest value found for that day/loc to prevent duplicate additions
+            $manualDataNormalized[$lNameNormalized][$dateISO] = max($manualDataNormalized[$lNameNormalized][$dateISO], (float)$amt);
+        }
+    }
+}
+
+// Perform Cleanup if duplicate or unnormalized keys existed
+if ($cleanupRequired) {
+    file_put_contents($dbFile, json_encode($manualDataNormalized));
+}
+
+// Final aggregation for display
+foreach ($manualDataNormalized as $lName => $dateMap) {
     foreach ($dateMap as $dateISO => $amt) {
         if ($dateISO < $startDate || $dateISO > $endDate) continue;
 
