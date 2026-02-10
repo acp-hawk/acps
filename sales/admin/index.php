@@ -305,18 +305,20 @@ foreach ($cleanedPool as $lName => $dateMap) {
 }
 
 // Stats Preparation
-$gTotal  = 0;
-$gTips   = 0;
-$gOrders = 0;
-$gNet    = 0;
+$gSquare = 0; // Square Net (Gross - Tips)
 $gCash   = 0;
+$gTips   = 0;
+$gGrand  = 0;
+$gOrders = 0;
+
 foreach ($data as $loc => $dates) {
     foreach ($dates as $d => $vals) {
-        $gTotal  += $vals['total'];
-        $gTips   += $vals['tips'];
-        $gOrders += $vals['orders'];
-        $gNet    += $vals['net'];
+        $lSqNet  = $vals['total'] - ($vals['cash'] ?? 0) - $vals['tips'];
+        $gSquare += $lSqNet;
         $gCash   += ($vals['cash'] ?? 0);
+        $gTips   += $vals['tips'];
+        $gGrand  += $vals['total'];
+        $gOrders += $vals['orders'];
     }
 }
 
@@ -528,20 +530,20 @@ for ($i = 0; $i < 12; $i++) {
 
         <div class="stat-grid" style="grid-template-columns: repeat(4, 1fr);">
             <div class="stat-box">
-                <div class="stat-lbl">Gross Revenue</div>
-                <div class="stat-val">$<?= number_format($gTotal/100, 2) ?></div>
+                <div class="stat-lbl">Square Sales</div>
+                <div class="stat-val" style="color:#fff;">$<?= number_format($gSquare/100, 2) ?></div>
             </div>
             <div class="stat-box">
-                <div class="stat-lbl">Cash Entries</div>
+                <div class="stat-lbl">Cash Sales</div>
                 <div class="stat-val text-success">$<?= number_format($gCash/100, 2) ?></div>
             </div>
             <div class="stat-box">
-                <div class="stat-lbl">Gratuity Pool</div>
+                <div class="stat-lbl">Staff Tips</div>
                 <div class="stat-val" style="color:#3b82f6;">$<?= number_format($gTips/100, 2) ?></div>
             </div>
-            <div class="stat-box">
-                <div class="stat-lbl">Transactions</div>
-                <div class="stat-val"><?= number_format($gOrders) ?></div>
+            <div class="stat-box" style="border-color: var(--accent); background: linear-gradient(145deg, #1a0005, #000);">
+                <div class="stat-lbl" style="color:var(--accent);">Grand Total</div>
+                <div class="stat-val" style="color:var(--accent);">$<?= number_format($gGrand/100, 2) ?></div>
             </div>
         </div>
 
@@ -594,22 +596,24 @@ for ($i = 0; $i < 12; $i++) {
                     <table>
                         <thead>
                             <tr>
-                                <th>Capture Date</th>
+                                <th>Date</th>
                                 <th>Orders</th>
-                                <th style="text-align:right;">Net</th>
-                                <th style="text-align:right;">Tips</th>
+                                <th style="text-align:right;">Square</th>
                                 <th style="text-align:right;">Cash</th>
-                                <th style="text-align:right;">Day Total</th>
+                                <th style="text-align:right;">Tips</th>
+                                <th style="text-align:right;">Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach($days as $date => $v): ?>
+                            <?php foreach($days as $date => $v): 
+                                $daySq = $v['total'] - ($v['cash']??0) - $v['tips'];
+                            ?>
                             <tr>
                                 <td><?= date('M d, Y', strtotime($date)) ?></td>
                                 <td><?= $v['orders'] ?></td>
-                                <td style="text-align:right;" class="cur">$<?= number_format($v['net']/100, 2) ?></td>
-                                <td style="text-align:right;" class="cur" style="color:#3b82f6;">+$<?= number_format($v['tips']/100, 2) ?></td>
-                                <td style="text-align:right;" class="cur text-success">+$<?= number_format(($v['cash']??0)/100, 2) ?></td>
+                                <td style="text-align:right;" class="cur">$<?= number_format($daySq/100, 2) ?></td>
+                                <td style="text-align:right;" class="cur text-success">$<?= number_format(($v['cash']??0)/100, 2) ?></td>
+                                <td style="text-align:right;" class="cur" style="color:#3b82f6;">$<?= number_format($v['tips']/100, 2) ?></td>
                                 <td style="text-align:right;" class="cur t-bold">$<?= number_format($v['total']/100, 2) ?></td>
                             </tr>
                             <?php endforeach; ?>
