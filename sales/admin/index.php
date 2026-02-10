@@ -69,6 +69,11 @@ if ($cacertPath && file_exists($cacertPath)) {
     ]);
 }
 
+$client = new SquareClient(
+    token: $accessToken,
+    options: $clientOptions,
+);
+
 // 3. Normalization Mapping
 $syncMap = [
     'Hawks Nest'         => 'Hawksnest',
