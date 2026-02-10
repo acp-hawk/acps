@@ -69,13 +69,7 @@ if ($cacertPath && file_exists($cacertPath)) {
     ]);
 }
 
-$client = new SquareClient(
-    token: $accessToken,
-    options: $clientOptions,
-);
-
-// 3. Normalization & Branding Configuration
-// This map defines how various raw names should be normalized to a standard name.
+// 3. Normalization Mapping
 $syncMap = [
     'Hawks Nest'         => 'Hawksnest',
     'Hawksnest'          => 'Hawksnest',
@@ -89,9 +83,6 @@ $syncMap = [
     'zipnslip'           => 'ZipnSlip'
 ];
 
-/**
- * Normalizes a raw location name to a standard format.
- */
 function getNormalizedLocationName(string $rawName, array $syncMap): string
 {
     $cleanedName = trim($rawName, " \t\n\r\0\x0B\"");
@@ -102,12 +93,6 @@ function getNormalizedLocationName(string $rawName, array $syncMap): string
     }
     return ucwords(strtolower($cleanedName));
 }
-
-$locMeta = [
-    'Hawksnest'     => ['color' => '#ff004c', 'logo' => 'https://alleycatphoto.net/assets/hawk.png'],
-    'Moonshine Mt.' => ['color' => '#ffcc00', 'logo' => 'https://alleycatphoto.net/assets/moonshine.png'],
-    'ZipnSlip'      => ['color' => '#00f2ff', 'logo' => 'https://alleycatphoto.net/assets/zipnslip.png'],
-];
 
 // 4. Handle Manual Cash Injection (Extreme Resiliency)
 if (isset($_GET['cash'])) {
@@ -122,33 +107,26 @@ if (isset($_GET['cash'])) {
 
     $dbFile = $adminDir . '/manual_cash.json';
     
-    // Genesis Ritual: Try to force the file into existence
-    if (!file_exists($dbFile)) {
-        @touch($dbFile);
-        @chmod($dbFile, 0666);
-    }
+    if (!file_exists($dbFile)) { @touch($dbFile); @chmod($dbFile, 0666); }
 
-    // Read current state
     $manualData = [];
     if (file_exists($dbFile) && filesize($dbFile) > 0) {
         $manualData = json_decode(file_get_contents($dbFile), true) ?: [];
     }
     
-    // Inject and save
     if (!isset($manualData[$lName])) $manualData[$lName] = [];
     $manualData[$lName][$dateISO] = $cashAmt;
     $json = json_encode($manualData, JSON_PRETTY_PRINT);
     
-    $result = file_put_contents($dbFile, $json, LOCK_EX);
-    if ($result === false) {
-         die("ERROR: The Wizard is blocked by server permissions. Cannot write to: $dbFile. Please set the 'admin' folder permissions to 755 or 777 via FTP.");
+    if (file_put_contents($dbFile, $json, LOCK_EX) === false) {
+         die("ERROR: Write failure at $dbFile. Permissions check failed.");
     }
 
     if (!isset($_GET['silent'])) {
         header('Location: ' . strtok($_SERVER["REQUEST_URI"], '?'));
         exit;
     } else {
-        die("ACK: $lName committed to $dbFile.");
+        die("WIZARD_ACK: $lName ($dateISO) committed.");
     }
 }
 
