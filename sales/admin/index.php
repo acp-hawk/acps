@@ -213,7 +213,8 @@ try {
                     'total' => 0,
                     'tips' => 0,
                     'orders' => 0,
-                    'net' => 0
+                    'net' => 0,
+                    'cash' => 0
                 ];
             }
             
@@ -253,7 +254,11 @@ foreach ($manualDataRaw as $rawLoc => $dateMap) {
             $data[$lName][$dateISO] = ['total' => 0, 'tips' => 0, 'orders' => 0, 'net' => 0, 'cash' => 0];
         }
         
-        $cents = (int)($amt * 100);
+        if (!isset($data[$lName][$dateISO]['cash'])) {
+            $data[$lName][$dateISO]['cash'] = 0;
+        }
+        
+        $cents = (int)round($amt * 100);
         $data[$lName][$dateISO]['cash']  += $cents;
         $data[$lName][$dateISO]['total'] += $cents;
         $data[$lName][$dateISO]['net']   += $cents;
