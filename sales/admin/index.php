@@ -322,7 +322,7 @@ foreach ($data as $loc => $dates) {
 
 // Location Meta (Colors & Logos)
 $locMeta = [
-    'Hawksnest'     => ['color' => '#ff004c', 'logo' => 'https://alleycatphoto.net/assets/hawk.png'],
+    'Hawksnest'     => ['color' => '#d90000', 'logo' => 'https://alleycatphoto.net/assets/hawk.png'],
     'Moonshine Mt.' => ['color' => '#ffcc00', 'logo' => 'https://alleycatphoto.net/assets/moonshine.png'],
     'ZipnSlip'      => ['color' => '#00f2ff', 'logo' => 'https://alleycatphoto.net/assets/zipnslip.png'],
 ];
