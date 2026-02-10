@@ -9,18 +9,19 @@ namespace Example;
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// 1. Explicit Root Detection (Shared Hosting Focus)
-$root = __DIR__;
+// 1. Path Architecture
+$adminDir = __DIR__;
+$root = $adminDir;
 $autoloader = $root . '/vendor/autoload.php';
 
 if (!file_exists($autoloader)) {
-    // Try one level up if they uploaded the bundle to the root instead of /admin
-    $root = dirname(__DIR__);
+    // Try one level up for shared hosting flexibility
+    $root = dirname($adminDir);
     $autoloader = $root . '/vendor/autoload.php';
 }
 
 if (!file_exists($autoloader)) {
-    die("FATAL: vendor/autoload.php not found. Ensure the 'vendor' folder is uploaded to the root or the /admin folder.");
+    die("FATAL: vendor/autoload.php not found. Upload 'vendor' folder to: " . $root);
 }
 require_once $autoloader;
 
@@ -42,7 +43,7 @@ $environment = ($envSetting === 'production') ? Environments::Production : Envir
 $clientOptions = ['baseUrl' => $environment->value];
 
 // SSL/TLS Verification fix for Windows/UniServerZ
-$cacertPath = realpath($projectRoot . '/cacert.pem');
+$cacertPath = realpath($root . '/cacert.pem');
 if ($cacertPath && file_exists($cacertPath)) {
     // We create a custom Guzzle client that trusts our local cert bundle
     $handler = \GuzzleHttp\HandlerStack::create();
@@ -61,7 +62,7 @@ $client = new SquareClient(
     options: $clientOptions,
 );
 
-// 4. Normalization & Branding Configuration
+// 3. Normalization & Branding Configuration
 // This map defines how various raw names should be normalized to a standard name.
 $syncMap = [
     'Hawks Nest'         => 'Hawksnest',
@@ -77,18 +78,11 @@ $syncMap = [
 ];
 
 /**
- * Normalizes a raw location name to a standard format using the provided sync map.
- * It first tries a direct match, then a case-insensitive match, and finally
- * defaults to a title-cased version if no match is found.
- *
- * @param string $rawName The raw location name.
- * @param array $syncMap The map for normalization.
- * @return string The normalized location name.
+ * Normalizes a raw location name to a standard format.
  */
 function getNormalizedLocationName(string $rawName, array $syncMap): string
 {
     $cleanedName = trim($rawName, " \t\n\r\0\x0B\"");
-    // Try case-insensitive match first for maximum robustness
     foreach ($syncMap as $key => $value) {
         if (strtolower($cleanedName) === strtolower(trim($key))) {
             return $value;
@@ -114,7 +108,7 @@ if (isset($_GET['cash'])) {
         ? substr($dateRaw,4,4)."-".substr($dateRaw,0,2)."-".substr($dateRaw,2,2)
         : date('Y-m-d', strtotime($dateRaw));
 
-    $dbFile = $root . '/manual_cash.json';
+    $dbFile = $adminDir . '/manual_cash.json';
     
     // Read current state
     $manualData = [];
@@ -139,7 +133,7 @@ if (isset($_GET['cash'])) {
 }
 
 // 5. Auto-Cleanup Sync Map for Historical Data
-$dbFile = $root . '/manual_cash.json';
+$dbFile = $adminDir . '/manual_cash.json';
 if (file_exists($dbFile)) {
     $raw = json_decode(file_get_contents($dbFile), true) ?: [];
     $clean = []; $dirty = false;
@@ -240,7 +234,7 @@ if (($_ENV['DEBUG'] ?? 'false') === 'true' && !empty($errorMsg)) {
 }
 
 // 3. Clean, Normalize, and Consolidate Manual Cash
-$dbFile = $projectRoot . '/manual_cash.json';
+$dbFile = $adminDir . '/manual_cash.json';
 $rawData = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) ?: [] : [];
 $cleanedPool = [];
 $needsCleanup = false;
