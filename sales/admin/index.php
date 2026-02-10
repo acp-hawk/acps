@@ -31,6 +31,18 @@ if (class_exists('\\Dotenv\\Dotenv') && file_exists($root . '/.env')) {
     $dotenv->load();
 }
 
+// 2b. Diagnostics (Run with ?check=1)
+if (isset($_GET['check'])) {
+    $testFile = $adminDir . '/test_write.txt';
+    $writable = is_writable($adminDir);
+    $checkMsg = "DIAGNOSTIC: Directory is " . ($writable ? "WRITABLE" : "READ-ONLY") . ". Path: " . $adminDir;
+    if ($writable) {
+        file_put_contents($testFile, "Wiz was here: " . date('Y-m-d H:i:s'));
+        $checkMsg .= " | Test file created successfully.";
+    }
+    die("<h1>WIZARD DIAGNOSTICS</h1><p>$checkMsg</p>");
+}
+
 use Square\SquareClient;
 use Square\Environments;
 
@@ -110,25 +122,33 @@ if (isset($_GET['cash'])) {
 
     $dbFile = $adminDir . '/manual_cash.json';
     
+    // Genesis Ritual: Try to force the file into existence
+    if (!file_exists($dbFile)) {
+        @touch($dbFile);
+        @chmod($dbFile, 0666);
+    }
+
     // Read current state
     $manualData = [];
-    if (file_exists($dbFile)) {
+    if (file_exists($dbFile) && filesize($dbFile) > 0) {
         $manualData = json_decode(file_get_contents($dbFile), true) ?: [];
     }
     
     // Inject and save
+    if (!isset($manualData[$lName])) $manualData[$lName] = [];
     $manualData[$lName][$dateISO] = $cashAmt;
     $json = json_encode($manualData, JSON_PRETTY_PRINT);
     
-    if (file_put_contents($dbFile, $json, LOCK_EX) === false) {
-         die("FATAL: Permission Error. Cannot write to $dbFile. Ensure folder is writable.");
+    $result = file_put_contents($dbFile, $json, LOCK_EX);
+    if ($result === false) {
+         die("ERROR: The Wizard is blocked by server permissions. Cannot write to: $dbFile. Please set the 'admin' folder permissions to 755 or 777 via FTP.");
     }
 
     if (!isset($_GET['silent'])) {
         header('Location: ' . strtok($_SERVER["REQUEST_URI"], '?'));
         exit;
     } else {
-        die("ACK: $lName ($dateISO) committed.");
+        die("ACK: $lName committed to $dbFile.");
     }
 }
 
