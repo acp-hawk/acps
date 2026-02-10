@@ -94,39 +94,63 @@ function getNormalizedLocationName(string $rawName, array $syncMap): string
     return ucwords(strtolower($cleanedName));
 }
 
-// 4. Handle Manual Cash Injection (Extreme Resiliency)
+// 4. Handle Cash Injections (Support Single or Batch POST)
+$dbFile = $adminDir . '/manual_cash.json';
+$updated = false;
+
+// BATCH INJECTION (Via POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_cash'])) {
+    $batch = json_decode($_POST['batch_cash'], true);
+    if (is_array($batch)) {
+        if (!file_exists($dbFile)) { @touch($dbFile); @chmod($dbFile, 0666); }
+        $fp = fopen($dbFile, "c+");
+        if (flock($fp, LOCK_EX)) {
+            $size = filesize($dbFile);
+            $data = ($size > 0) ? json_decode(fread($fp, $size), true) : [];
+            foreach ($batch as $entry) {
+                $l = getNormalizedLocationName($entry['loc'] ?? 'UNKNOWN', $syncMap);
+                $d = $entry['date'];
+                $c = (float)$entry['cash'];
+                $data[$l][$d] = $c;
+            }
+            ftruncate($fp, 0); rewind($fp);
+            fwrite($fp, json_encode($data, JSON_PRETTY_PRINT));
+            fflush($fp); flock($fp, LOCK_UN);
+            $updated = true;
+        }
+        fclose($fp);
+        die("WIZARD_ACK: Batch of " . count($batch) . " committed.");
+    }
+}
+
+// SINGLE INJECTION (Via GET)
 if (isset($_GET['cash'])) {
     $locId = $_GET['loc'] ?? $_GET['location'] ?? 'UNKNOWN';
     $cashAmt = (float)$_GET['cash'];
     $dateRaw = $_GET['date'] ?? date('Y-m-d');
-    
     $lName = getNormalizedLocationName($locId, $syncMap);
     $dateISO = (strlen($dateRaw) === 8 && is_numeric($dateRaw)) 
         ? substr($dateRaw,4,4)."-".substr($dateRaw,0,2)."-".substr($dateRaw,2,2)
         : date('Y-m-d', strtotime($dateRaw));
 
-    $dbFile = $adminDir . '/manual_cash.json';
-    
     if (!file_exists($dbFile)) { @touch($dbFile); @chmod($dbFile, 0666); }
-
-    $manualData = [];
-    if (file_exists($dbFile) && filesize($dbFile) > 0) {
-        $manualData = json_decode(file_get_contents($dbFile), true) ?: [];
+    $fp = fopen($dbFile, "c+");
+    if (flock($fp, LOCK_EX)) {
+        $size = filesize($dbFile);
+        $data = ($size > 0) ? json_decode(fread($fp, $size), true) : [];
+        $data[$lName][$dateISO] = $cashAmt;
+        ftruncate($fp, 0); rewind($fp);
+        fwrite($fp, json_encode($data, JSON_PRETTY_PRINT));
+        fflush($fp); flock($fp, LOCK_UN);
+        $updated = true;
     }
-    
-    if (!isset($manualData[$lName])) $manualData[$lName] = [];
-    $manualData[$lName][$dateISO] = $cashAmt;
-    $json = json_encode($manualData, JSON_PRETTY_PRINT);
-    
-    if (file_put_contents($dbFile, $json, LOCK_EX) === false) {
-         die("ERROR: Write failure at $dbFile. Permissions check failed.");
-    }
+    fclose($fp);
 
     if (!isset($_GET['silent'])) {
         header('Location: ' . strtok($_SERVER["REQUEST_URI"], '?'));
         exit;
     } else {
-        die("WIZARD_ACK: $lName ($dateISO) committed.");
+        die("WIZARD_ACK: Single entry ($lName) committed.");
     }
 }
 
