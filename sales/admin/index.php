@@ -61,6 +61,7 @@ $client = new SquareClient(
 );
 
 // 4. Normalization & Branding Configuration
+// This map defines how various raw names should be normalized to a standard name.
 $syncMap = [
     'Hawks Nest'         => 'Hawksnest',
     'Hawksnest'          => 'Hawksnest',
@@ -73,6 +74,27 @@ $syncMap = [
     'ZipnSlip'           => 'ZipnSlip',
     'zipnslip'           => 'ZipnSlip'
 ];
+
+/**
+ * Normalizes a raw location name to a standard format using the provided sync map.
+ * It first tries a direct match, then a case-insensitive match, and finally
+ * defaults to a title-cased version if no match is found.
+ *
+ * @param string $rawName The raw location name.
+ * @param array $syncMap The map for normalization.
+ * @return string The normalized location name.
+ */
+function getNormalizedLocationName(string $rawName, array $syncMap): string
+{
+    $cleanedName = trim($rawName, " \t\n\r\0\x0B\"");
+    // Try case-insensitive match first for maximum robustness
+    foreach ($syncMap as $key => $value) {
+        if (strtolower($cleanedName) === strtolower(trim($key))) {
+            return $value;
+        }
+    }
+    return ucwords(strtolower($cleanedName));
+}
 
 $locMeta = [
     'Hawksnest'     => ['color' => '#ff004c', 'logo' => 'https://alleycatphoto.net/assets/hawk.png'],
@@ -87,7 +109,7 @@ if (isset($_GET['loc']) || isset($_GET['location'])) {
         $cashAmt = (float)$_GET['cash'];
         $dateRaw = $_GET['date'] ?? date('Y-m-d');
         
-        $lName = $syncMap[trim($locId)] ?? ucwords($locId);
+        $lName = getNormalizedLocationName($locId, $syncMap);
         $dateISO = (strlen($dateRaw) === 8 && is_numeric($dateRaw)) 
             ? substr($dateRaw,4,4)."-".substr($dateRaw,0,2)."-".substr($dateRaw,2,2)
             : date('Y-m-d', strtotime($dateRaw));
@@ -117,7 +139,7 @@ if (file_exists($csvPath)) {
         if (count($row) < 5) continue;
         if (strtolower(trim($row[3], " \"")) === 'cash') {
             $lRaw = trim($row[0], " \"");
-            $lName = $syncMap[$lRaw] ?? $lRaw;
+            $lName = getNormalizedLocationName($lRaw, $syncMap);
             $dParts = explode('/', trim($row[1], " \""));
             if (count($dParts) === 3) {
                 $dISO = "{$dParts[2]}-{$dParts[0]}-{$dParts[1]}";
@@ -160,7 +182,7 @@ try {
     foreach ($locations as $loc) {
         $lId = $loc->getId();
         $lRawName = $loc->getName();
-        $lName = $syncMap[$lRawName] ?? $lRawName;
+        $lName = getNormalizedLocationName($lRawName, $syncMap);
         $locationNames[$lId] = $lName;
 
         // 2. Fetch Payments for this specific location
@@ -222,7 +244,7 @@ $dbFile = $projectRoot . '/manual_cash.json';
 $manualDataRaw = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
 
 foreach ($manualDataRaw as $rawLoc => $dateMap) {
-    $lName = $syncMap[$rawLoc] ?? $rawLoc;
+    $lName = getNormalizedLocationName($rawLoc, $syncMap);
     foreach ($dateMap as $dateISO => $amt) {
         if ($dateISO < $startDate || $dateISO > $endDate) continue;
 
@@ -234,7 +256,6 @@ foreach ($manualDataRaw as $rawLoc => $dateMap) {
         $cents = (int)($amt * 100);
         $data[$lName][$dateISO]['cash']  += $cents;
         $data[$lName][$dateISO]['total'] += $cents;
-        // Manual cash entries contribute to total but we treat them as net=total (no split in current manual entry)
         $data[$lName][$dateISO]['net']   += $cents;
     }
 }
@@ -381,7 +402,6 @@ for ($i = 0; $i < 12; $i++) {
 
         .loc-badge {
             background: transparent;
-            color: #fff;
             padding: 0;
             border-radius: 0;
             font-size: 42px;
@@ -392,7 +412,7 @@ for ($i = 0; $i < 12; $i++) {
             align-items: center;
             gap: 25px;
         }
-        .loc-badge img { height: 60px; width: auto; filter: none; }
+        .loc-badge img { height: 64px; width: auto; filter: none; border-radius: 6px; }
 
         .void-msg { text-align: center; padding: 100px 0; color: var(--muted); }
         
@@ -497,33 +517,33 @@ for ($i = 0; $i < 12; $i++) {
                 
                 $meta = $locMeta[$loc] ?? ['color' => '#fff', 'logo' => ''];
             ?>
-            <div class="glass" style="border-top: 5px solid <?= $meta['color'] ?>;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+            <div class="glass" style="border-top: 5px solid <?= $meta['color'] ?>; padding-top: 40px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:30px;">
                     <div>
-                        <div class="loc-badge" style="color: <?= $meta['color'] ?>; margin-bottom:15px;">
+                        <div class="loc-badge" style="color: <?= $meta['color'] ?>; margin-bottom:15px; line-height: 1;">
                             <?php if($meta['logo']): ?>
                                 <img src="<?= $meta['logo'] ?>" alt="icon">
                             <?php endif; ?>
                             <?= htmlspecialchars($loc) ?>
                         </div>
-                        <div style="display:flex; gap:40px; margin-top:5px;">
+                        <div style="display:flex; gap:40px; margin-top:10px;">
                             <div>
-                                <div class="stat-lbl" style="margin:0;">Orders</div>
-                                <div class="t-bold" style="font-size:20px;"><?= number_format($lCount) ?></div>
+                                <div class="stat-lbl" style="margin:0; font-size: 10px;">Square Trans</div>
+                                <div class="t-bold" style="font-size:22px;"><?= number_format($lCount) ?></div>
                             </div>
                             <div>
-                                <div class="stat-lbl" style="margin:0;">Cash</div>
-                                <div class="t-bold text-success" style="font-size:20px;">$<?= number_format($lCash/100, 2) ?></div>
+                                <div class="stat-lbl" style="margin:0; font-size: 10px;">Cash Captured</div>
+                                <div class="t-bold text-success" style="font-size:22px;">$<?= number_format($lCash/100, 2) ?></div>
                             </div>
                             <div>
-                                <div class="stat-lbl" style="margin:0;">Staff Tips</div>
-                                <div class="t-bold" style="font-size:20px; color:#3b82f6;">$<?= number_format($lTips/100, 2) ?></div>
+                                <div class="stat-lbl" style="margin:0; font-size: 10px;">Staff Tribute</div>
+                                <div class="t-bold" style="font-size:22px; color:#3b82f6;">$<?= number_format($lTips/100, 2) ?></div>
                             </div>
                         </div>
                     </div>
                     <div style="text-align:right;">
-                        <div class="stat-lbl" style="margin:0;">Total Revenue</div>
-                        <div class="t-bold" style="font-size:48px; color: <?= $meta['color'] ?>; letter-spacing:-2px;">$<?= number_format($lGross/100, 2) ?></div>
+                        <div class="stat-lbl" style="margin:0; letter-spacing: 4px;">LOC TOTAL</div>
+                        <div class="t-bold" style="font-size:54px; color: <?= $meta['color'] ?>; letter-spacing:-3px; line-height: 0.9;">$<?= number_format($lGross/100, 2) ?></div>
                     </div>
                 </div>
                 <div class="table-wrap">
