@@ -9,14 +9,23 @@ namespace Example;
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Dynamic Project Root Discovery
+$projectRoot = __DIR__;
+while ($projectRoot !== dirname($projectRoot)) {
+    if (file_exists($projectRoot . '/vendor/autoload.php')) {
+        break;
+    }
+    $projectRoot = dirname($projectRoot);
+}
+
 // Core dependencies
-if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
-    require_once __DIR__ . '/../../vendor/autoload.php';
+if (file_exists($projectRoot . '/vendor/autoload.php')) {
+    require_once $projectRoot . '/vendor/autoload.php';
 }
 
 // Load environment variables
-if (class_exists('\\Dotenv\\Dotenv') && file_exists(__DIR__ . '/../../.env')) {
-    $dotenv = \Dotenv\Dotenv::createImmutable(__DIR__ . '/../../');
+if (class_exists('\\Dotenv\\Dotenv') && file_exists($projectRoot . '/.env')) {
+    $dotenv = \Dotenv\Dotenv::createImmutable($projectRoot);
     $dotenv->load();
 }
 
@@ -32,7 +41,7 @@ $environment = ($envSetting === 'production') ? Environments::Production : Envir
 $clientOptions = ['baseUrl' => $environment->value];
 
 // SSL/TLS Verification fix for Windows/UniServerZ
-$cacertPath = realpath(__DIR__ . '/../../cacert.pem');
+$cacertPath = realpath($projectRoot . '/cacert.pem');
 if ($cacertPath && file_exists($cacertPath)) {
     // We create a custom Guzzle client that trusts our local cert bundle
     $handler = \GuzzleHttp\HandlerStack::create();
@@ -51,64 +60,69 @@ $client = new SquareClient(
     options: $clientOptions,
 );
 
+// 4. Normalization & Branding Configuration
+$syncMap = [
+    'Hawks Nest'         => 'Hawksnest',
+    'Hawksnest'          => 'Hawksnest',
+    'hawksnest'          => 'Hawksnest',
+    'Moonshine Mountain' => 'Moonshine Mt.',
+    'Moonshine'          => 'Moonshine Mt.',
+    'moonshine'          => 'Moonshine Mt.',
+    'Moonshine Mt.'      => 'Moonshine Mt.',
+    'Zip n Slip'         => 'ZipnSlip',
+    'ZipnSlip'           => 'ZipnSlip',
+    'zipnslip'           => 'ZipnSlip'
+];
+
+$locMeta = [
+    'Hawksnest'     => ['color' => '#ff004c', 'logo' => 'https://alleycatphoto.net/assets/hawk.png'],
+    'Moonshine Mt.' => ['color' => '#ffcc00', 'logo' => 'https://alleycatphoto.net/assets/moonshine.png'],
+    'ZipnSlip'      => ['color' => '#00f2ff', 'logo' => 'https://alleycatphoto.net/assets/zipnslip.png'],
+];
+
 // 4. Handle Manual Cash Injection
-if (isset($_GET['loc']) && isset($_GET['cash']) && isset($_GET['date'])) {
-    $locSlug = strtolower($_GET['loc']);
-    $cashAmt = (float)$_GET['cash'];
-    $dateRaw = $_GET['date'];
-    
-    if (strlen($dateRaw) === 8) {
-        $y = substr($dateRaw, 4, 4);
-        $m = substr($dateRaw, 0, 2);
-        $d = substr($dateRaw, 2, 2);
-        $dateISO = "$y-$m-$d";
-
-        $slugMap = [
-            'hawksnest' => 'Hawksnest',
-            'moonshine' => 'Moonshine Mt.',
-            'zipnslip'  => 'ZipnSlip'
-        ];
-        $locName = $slugMap[$locSlug] ?? ucwords($locSlug);
-
-        $dbFile = __DIR__ . '/manual_cash.json';
-        $manualData = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
-        if (!isset($manualData[$locName])) $manualData[$locName] = [];
-        if (!isset($manualData[$locName][$dateISO])) $manualData[$locName][$dateISO] = 0;
+if (isset($_GET['loc']) || isset($_GET['location'])) {
+    if (isset($_GET['cash'])) {
+        $locId = $_GET['loc'] ?? $_GET['location'];
+        $cashAmt = (float)$_GET['cash'];
+        $dateRaw = $_GET['date'] ?? date('Y-m-d');
         
-        $manualData[$locName][$dateISO] += $cashAmt;
-        file_put_contents($dbFile, json_encode($manualData));
+        $lName = $syncMap[trim($locId)] ?? ucwords($locId);
+        $dateISO = (strlen($dateRaw) === 8 && is_numeric($dateRaw)) 
+            ? substr($dateRaw,4,4)."-".substr($dateRaw,0,2)."-".substr($dateRaw,2,2)
+            : date('Y-m-d', strtotime($dateRaw));
 
-        header('Location: ' . strtok($_SERVER["REQUEST_URI"], '?'));
-        exit;
+        $dbFile = $projectRoot . '/manual_cash.json';
+        $manualData = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
+        if (!isset($manualData[$lName])) $manualData[$lName] = [];
+        $manualData[$lName][$dateISO] = $cashAmt; 
+        
+        file_put_contents($dbFile, json_encode($manualData));
+        if (!isset($_GET['silent'])) {
+            header('Location: ' . strtok($_SERVER["REQUEST_URI"], '?'));
+            exit;
+        }
     }
 }
 
-// 5. Sync Cash from transactions.csv to manual_cash.json
-$csvPath = __DIR__ . '/../transactions.csv';
-$dbFile = __DIR__ . '/manual_cash.json';
+// 5. Sync Cash from transactions.csv
+$csvPath = $projectRoot . '/transactions.csv';
+$dbFile = $projectRoot . '/manual_cash.json';
 if (file_exists($csvPath)) {
     $manualData = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
     $handle = fopen($csvPath, 'r');
     $header = fgetcsv($handle);
-    $syncMap = [
-        'Hawks Nest' => 'Hawksnest',
-        'Moonshine Mountain' => 'Moonshine Mt.',
-        'Zip n Slip' => 'ZipnSlip',
-        'Hawksnest' => 'Hawksnest',
-        'ZipnSlip' => 'ZipnSlip'
-    ];
     $dirty = false;
     while (($row = fgetcsv($handle)) !== false) {
         if (count($row) < 5) continue;
-        $type = strtolower(trim($row[3], " \""));
-        if ($type === 'cash') {
+        if (strtolower(trim($row[3], " \"")) === 'cash') {
             $lRaw = trim($row[0], " \"");
             $lName = $syncMap[$lRaw] ?? $lRaw;
             $dParts = explode('/', trim($row[1], " \""));
             if (count($dParts) === 3) {
                 $dISO = "{$dParts[2]}-{$dParts[0]}-{$dParts[1]}";
                 $val = (float)str_replace(['$',','],'', $row[4]);
-                if (!isset($manualData[$lName][$dISO]) || $manualData[$lName][$dISO] < $val) {
+                if (!isset($manualData[$lName][$dISO]) || (float)$manualData[$lName][$dISO] != $val) {
                     $manualData[$lName][$dISO] = $val;
                     $dirty = true;
                 }
@@ -145,7 +159,8 @@ try {
     
     foreach ($locations as $loc) {
         $lId = $loc->getId();
-        $lName = $loc->getName();
+        $lRawName = $loc->getName();
+        $lName = $syncMap[$lRawName] ?? $lRawName;
         $locationNames[$lId] = $lName;
 
         // 2. Fetch Payments for this specific location
@@ -202,24 +217,24 @@ if (($_ENV['DEBUG'] ?? 'false') === 'true' && !empty($errorMsg)) {
     error_log("[DAEMON: Gemicunt] :: ERROR :: " . $errorMsg);
 }
 
-// 3. Load and Merge Manual Cash
-$dbFile = __DIR__ . '/manual_cash.json';
-$manualData = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
+// 3. Load and Merge Manual Cash (With aggressive consolidation)
+$dbFile = $projectRoot . '/manual_cash.json';
+$manualDataRaw = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) : [];
 
-foreach ($manualData as $lName => $dateMap) {
+foreach ($manualDataRaw as $rawLoc => $dateMap) {
+    $lName = $syncMap[$rawLoc] ?? $rawLoc;
     foreach ($dateMap as $dateISO => $amt) {
-        // Filter by date range
         if ($dateISO < $startDate || $dateISO > $endDate) continue;
 
         if (!isset($data[$lName])) $data[$lName] = [];
         if (!isset($data[$lName][$dateISO])) {
             $data[$lName][$dateISO] = ['total' => 0, 'tips' => 0, 'orders' => 0, 'net' => 0, 'cash' => 0];
         }
-        if (!isset($data[$lName][$dateISO]['cash'])) $data[$lName][$dateISO]['cash'] = 0;
         
         $cents = (int)($amt * 100);
         $data[$lName][$dateISO]['cash']  += $cents;
         $data[$lName][$dateISO]['total'] += $cents;
+        // Manual cash entries contribute to total but we treat them as net=total (no split in current manual entry)
         $data[$lName][$dateISO]['net']   += $cents;
     }
 }
@@ -297,8 +312,8 @@ for ($i = 0; $i < 12; $i++) {
 
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
         .logo-area { display: flex; align-items: center; gap: 20px; }
-        .logo-area img { height: 50px; filter: drop-shadow(0 0 15px var(--accent-glow)); }
-        .logo-text h1 { margin: 0; font-weight: 900; font-size: 28px; letter-spacing: -1px; text-transform: uppercase; }
+        .logo-area img { height: 60px; filter: none; }
+        .logo-text h1 { margin: 0; font-weight: 900; font-size: 32px; letter-spacing: -1px; text-transform: uppercase; }
         .logo-text span { color: var(--accent); font-weight: 700; font-size: 11px; letter-spacing: 4px; text-transform: uppercase; }
 
         .filters { display: flex; gap: 20px; align-items: flex-end; }
@@ -369,15 +384,15 @@ for ($i = 0; $i < 12; $i++) {
             color: #fff;
             padding: 0;
             border-radius: 0;
-            font-size: 28px;
+            font-size: 42px;
             font-weight: 900;
             text-transform: uppercase;
-            letter-spacing: -1px;
+            letter-spacing: -2px;
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 25px;
         }
-        .loc-badge img { height: 48px; width: auto; }
+        .loc-badge img { height: 60px; width: auto; filter: none; }
 
         .void-msg { text-align: center; padding: 100px 0; color: var(--muted); }
         
@@ -454,7 +469,7 @@ for ($i = 0; $i < 12; $i++) {
             </div>
             <div class="stat-box">
                 <div class="stat-lbl">Cash Entries</div>
-                <div class="stat-val t-green">$<?= number_format($gCash/100, 2) ?></div>
+                <div class="stat-val text-success">$<?= number_format($gCash/100, 2) ?></div>
             </div>
             <div class="stat-box">
                 <div class="stat-lbl">Gratuity Pool</div>
@@ -482,7 +497,7 @@ for ($i = 0; $i < 12; $i++) {
                 
                 $meta = $locMeta[$loc] ?? ['color' => '#fff', 'logo' => ''];
             ?>
-            <div class="glass" style="border-top: 4px solid <?= $meta['color'] ?>;">
+            <div class="glass" style="border-top: 5px solid <?= $meta['color'] ?>;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
                     <div>
                         <div class="loc-badge" style="color: <?= $meta['color'] ?>; margin-bottom:15px;">
@@ -498,7 +513,7 @@ for ($i = 0; $i < 12; $i++) {
                             </div>
                             <div>
                                 <div class="stat-lbl" style="margin:0;">Cash</div>
-                                <div class="t-bold t-green" style="font-size:20px;">$<?= number_format($lCash/100, 2) ?></div>
+                                <div class="t-bold text-success" style="font-size:20px;">$<?= number_format($lCash/100, 2) ?></div>
                             </div>
                             <div>
                                 <div class="stat-lbl" style="margin:0;">Staff Tips</div>
@@ -508,7 +523,7 @@ for ($i = 0; $i < 12; $i++) {
                     </div>
                     <div style="text-align:right;">
                         <div class="stat-lbl" style="margin:0;">Total Revenue</div>
-                        <div class="t-bold" style="font-size:40px; color: <?= $meta['color'] ?>;">$<?= number_format($lGross/100, 2) ?></div>
+                        <div class="t-bold" style="font-size:48px; color: <?= $meta['color'] ?>; letter-spacing:-2px;">$<?= number_format($lGross/100, 2) ?></div>
                     </div>
                 </div>
                 <div class="table-wrap">
@@ -530,7 +545,7 @@ for ($i = 0; $i < 12; $i++) {
                                 <td><?= $v['orders'] ?></td>
                                 <td style="text-align:right;" class="cur">$<?= number_format($v['net']/100, 2) ?></td>
                                 <td style="text-align:right;" class="cur" style="color:#3b82f6;">+$<?= number_format($v['tips']/100, 2) ?></td>
-                                <td style="text-align:right;" class="cur t-green">+$<?= number_format(($v['cash']??0)/100, 2) ?></td>
+                                <td style="text-align:right;" class="cur text-success">+$<?= number_format(($v['cash']??0)/100, 2) ?></td>
                                 <td style="text-align:right;" class="cur t-bold">$<?= number_format($v['total']/100, 2) ?></td>
                             </tr>
                             <?php endforeach; ?>
