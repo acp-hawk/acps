@@ -9,23 +9,24 @@ namespace Example;
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Dynamic Project Root Discovery
-$projectRoot = __DIR__;
-while ($projectRoot !== dirname($projectRoot)) {
-    if (file_exists($projectRoot . '/vendor/autoload.php')) {
-        break;
-    }
-    $projectRoot = dirname($projectRoot);
+// 1. Explicit Root Detection (Shared Hosting Focus)
+$root = __DIR__;
+$autoloader = $root . '/vendor/autoload.php';
+
+if (!file_exists($autoloader)) {
+    // Try one level up if they uploaded the bundle to the root instead of /admin
+    $root = dirname(__DIR__);
+    $autoloader = $root . '/vendor/autoload.php';
 }
 
-// Core dependencies
-if (file_exists($projectRoot . '/vendor/autoload.php')) {
-    require_once $projectRoot . '/vendor/autoload.php';
+if (!file_exists($autoloader)) {
+    die("FATAL: vendor/autoload.php not found. Ensure the 'vendor' folder is uploaded to the root or the /admin folder.");
 }
+require_once $autoloader;
 
-// Load environment variables
-if (class_exists('\\Dotenv\\Dotenv') && file_exists($projectRoot . '/.env')) {
-    $dotenv = \Dotenv\Dotenv::createImmutable($projectRoot);
+// 2. Load Environment
+if (class_exists('\\Dotenv\\Dotenv') && file_exists($root . '/.env')) {
+    $dotenv = \Dotenv\Dotenv::createImmutable($root);
     $dotenv->load();
 }
 
@@ -102,7 +103,7 @@ $locMeta = [
     'ZipnSlip'      => ['color' => '#00f2ff', 'logo' => 'https://alleycatphoto.net/assets/zipnslip.png'],
 ];
 
-// 4. Handle Manual Cash Injection (Atomic & Safe)
+// 4. Handle Manual Cash Injection (Extreme Resiliency)
 if (isset($_GET['cash'])) {
     $locId = $_GET['loc'] ?? $_GET['location'] ?? 'UNKNOWN';
     $cashAmt = (float)$_GET['cash'];
@@ -113,19 +114,21 @@ if (isset($_GET['cash'])) {
         ? substr($dateRaw,4,4)."-".substr($dateRaw,0,2)."-".substr($dateRaw,2,2)
         : date('Y-m-d', strtotime($dateRaw));
 
-    $dbFile = $projectRoot . '/manual_cash.json';
+    $dbFile = $root . '/manual_cash.json';
     
-    // Perform an Atomic Read-Update-Write cycle
+    // Read current state
     $manualData = [];
     if (file_exists($dbFile)) {
         $manualData = json_decode(file_get_contents($dbFile), true) ?: [];
     }
     
-    if (!isset($manualData[$lName])) $manualData[$lName] = [];
+    // Inject and save
     $manualData[$lName][$dateISO] = $cashAmt;
+    $json = json_encode($manualData, JSON_PRETTY_PRINT);
     
-    // This lock prevents JSON corruption from rapid-fire sync hits
-    file_put_contents($dbFile, json_encode($manualData), LOCK_EX);
+    if (file_put_contents($dbFile, $json, LOCK_EX) === false) {
+         die("FATAL: Permission Error. Cannot write to $dbFile. Ensure folder is writable.");
+    }
 
     if (!isset($_GET['silent'])) {
         header('Location: ' . strtok($_SERVER["REQUEST_URI"], '?'));
@@ -135,30 +138,20 @@ if (isset($_GET['cash'])) {
     }
 }
 
-// 5. Sync Cash from local transactions.csv (Optional helper)
-$csvPath = $projectRoot . '/transactions.csv';
-$dbFile = $projectRoot . '/manual_cash.json';
-if (file_exists($csvPath)) {
-    $manualData = file_exists($dbFile) ? json_decode(file_get_contents($dbFile), true) ?: [] : [];
-    $handle = fopen($csvPath, 'r'); fgetcsv($handle);
-    $dirty = false;
-    while (($row = fgetcsv($handle)) !== false) {
-        if (count($row) < 5) continue;
-        if (strtolower(trim($row[3], " \"")) === 'cash') {
-            $lName = getNormalizedLocationName($row[0], $syncMap);
-            $dParts = explode('/', trim($row[1], " \""));
-            if (count($dParts) === 3) {
-                $dISO = "{$dParts[2]}-{$dParts[0]}-{$dParts[1]}";
-                $val = (float)str_replace(['$',','],'', $row[4]);
-                if (!isset($manualData[$lName][$dISO]) || (float)$manualData[$lName][$dISO] != $val) {
-                    $manualData[$lName][$dISO] = $val;
-                    $dirty = true;
-                }
-            }
+// 5. Auto-Cleanup Sync Map for Historical Data
+$dbFile = $root . '/manual_cash.json';
+if (file_exists($dbFile)) {
+    $raw = json_decode(file_get_contents($dbFile), true) ?: [];
+    $clean = []; $dirty = false;
+    foreach ($raw as $lk => $dates) {
+        $sk = getNormalizedLocationName($lk, $syncMap);
+        if ($sk !== $lk) $dirty = true;
+        if (!isset($clean[$sk])) $clean[$sk] = [];
+        foreach ($dates as $d => $v) {
+            $clean[$sk][$d] = max((float)($clean[$sk][$d] ?? 0), (float)$v);
         }
     }
-    fclose($handle);
-    if ($dirty) file_put_contents($dbFile, json_encode($manualData), LOCK_EX);
+    if ($dirty) file_put_contents($dbFile, json_encode($clean, JSON_PRETTY_PRINT), LOCK_EX);
 }
 
 // Date filters from GET
