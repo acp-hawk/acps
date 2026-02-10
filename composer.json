@@ -13,7 +13,8 @@
         "authorizenet/authorizenet": "^2.0",
         "ext-json": "*",
         "ext-curl": "*",
-        "ext-mbstring": "*"
+        "ext-mbstring": "*",
+        "mike42/escpos-php": "^4.0"
     },
     "config": {
         "allow-plugins": {
